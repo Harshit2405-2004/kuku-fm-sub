@@ -99,3 +99,20 @@ A running log of every task Claude Code executes, in order. A new session must b
 **AI mistakes caught:** none
 **Open issues / risks:** none
 **Next:** T1.3
+
+### T1.3: Aliases + real-pack parse stats  ·  2026-11-07  ·  status: done
+**Goal:** `aliases.py` (load map, missing file = raw names), real-pack stats, a draft alias map for Harshit to verify.
+**What I did:**
+- Tests first (RED: import error), then `load_aliases`, `pack_stats` and a stats CLI (`python -m promo_finder.parse --input <pack> [--speakers] [--out]`).
+- Parsed the real pack. Counts are below; speaker names, warnings and the reasoning behind the alias draft are in `private/parse_stats_T1.3.md`.
+- Drafted `config/aliases.yaml` (git-ignored): 22 raw labels merged into 8 characters, ambiguous labels deliberately left unmapped and marked VERIFY.
+- Found that the private notes' guess about one descriptive label was contradicted by the script context (details private). Logged as an open check for CP-1, not as an AI mistake yet.
+**Files changed:** promo_finder/{aliases,parse}.py, tests/test_aliases.py; private: config/aliases.yaml, private/parse_stats_T1.3.md, outputs/parse_T1.3/episodes.json
+**Commands & results:**
+    $ pytest -q → (RED) 1 error during collection: cannot import load_aliases; then 54 passed in 0.37s
+    $ python -m promo_finder.parse --input input → episodes 50, scenes 100, blocks 3727 (CAMERA 1754, ACTION 372, DIALOGUE 1487, SOUND_FX 114); duration min 70.5 s, max 200.8 s, total 102.7 min; raw speakers 64 → canonical 52 (with the draft map); warnings 1 (block 0.3 s past its scene end)
+    $ python scripts/leak_check.py → PASS (45 files, 28 alias names, 40 keywords, 20 dialogue lines)
+**Decisions:** none new (alias format documented in config/aliases.example.yaml)
+**AI mistakes caught:** none yet; the alias draft is verified at CP-1
+**Open issues / risks:** One descriptive label probably covers one character across early and late episodes; a global alias map can't split a label by episode. If Harshit finds it's really two people, we need per-episode overrides (a spec change).
+**Next:** T1.4

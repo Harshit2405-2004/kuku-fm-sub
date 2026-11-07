@@ -7,14 +7,18 @@ HH:MM:SS, CRLF, missing optional parts): oddities become warnings, never crashes
 
 from __future__ import annotations
 
+import argparse
+import logging
+import json
 import re
 import zipfile
+from collections import Counter
 from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel
 
-from promo_finder.aliases import canonical_speaker
+from promo_finder.aliases import canonical_speaker, load_aliases
 
 BlockType = Literal["CAMERA", "ACTION", "SOUND_FX", "DIALOGUE"]
 
@@ -272,3 +276,54 @@ def load_pack(path: Path | str, aliases: dict[str, str] | None = None) -> tuple[
             warnings.append(f"duplicate episode number {e.ep} ({e.source_file})")
         seen.add(e.ep)
     return episodes, warnings
+
+
+def pack_stats(episodes: list[Episode]) -> dict:
+    """Summary numbers for a parsed pack (printed by the CLI, checked at CP-1)."""
+    durations = [e.duration for e in episodes]
+    blocks = [b for e in episodes for b in e.blocks]
+    return {
+        "episodes": len(episodes),
+        "blocks": len(blocks),
+        "blocks_by_type": dict(Counter(b.type for b in blocks)),
+        "scenes": sum(len(e.scenes) for e in episodes),
+        "duration_min": min(durations),
+        "duration_max": max(durations),
+        "duration_total": round(sum(durations), 2),
+        "raw_speakers": dict(Counter(b.speaker_raw for b in blocks if b.type == "DIALOGUE")),
+        "speakers": dict(Counter(b.speaker for b in blocks if b.type == "DIALOGUE")),
+    }
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Parse a script pack and print its stats.")
+    parser.add_argument("--input", required=True, help="pack folder or .zip")
+    parser.add_argument("--aliases", default="config/aliases.yaml", help="alias map (optional)")
+    parser.add_argument("--out", help="write episodes JSON here")
+    parser.add_argument("--speakers", action="store_true", help="also list raw speaker labels")
+    args = parser.parse_args()
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+
+    aliases, _cast = load_aliases(args.aliases)
+    episodes, warnings = load_pack(args.input, aliases)
+    stats = pack_stats(episodes)
+    print(f"episodes: {stats['episodes']}  scenes: {stats['scenes']}  blocks: {stats['blocks']}")
+    print("blocks by type:", stats["blocks_by_type"])
+    print(f"duration: min {stats['duration_min']:.1f}s  max {stats['duration_max']:.1f}s  "
+          f"total {stats['duration_total'] / 60:.1f} min")
+    print(f"distinct raw speakers: {len(stats['raw_speakers'])}  canonical: {len(stats['speakers'])}")
+    print(f"warnings: {len(warnings)}")
+    for w in warnings:
+        print("  ", w)
+    if args.speakers:
+        for name, count in sorted(stats["raw_speakers"].items(), key=lambda kv: -kv[1]):
+            print(f"  {count:4d}  {name}")
+    if args.out:
+        out = Path(args.out)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps([e.model_dump() for e in episodes], indent=1), encoding="utf-8")
+        print("wrote", out)
+
+
+if __name__ == "__main__":
+    main()
