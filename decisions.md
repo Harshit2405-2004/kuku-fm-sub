@@ -327,3 +327,22 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Before/after (gpt-oss-120b, same non-gold episodes 6, 24, 40; runs `smoke_T3.5_gptoss_20261107_200730` → `smoke_v3_gptoss_20261107_204635`): proposals 6 → 2; valid clips 4 → 2; too_short rejects 2 → 0; the quiet episode 2 proposals → 0. The episode containing a strike now opens on it (hook offset 1.7 s); before, the strike sat about 26 s into the clip. Both v3 clips have hook offsets ≤ 1.7 s, and both beat types now name the hook. Details are only in private/smoke_T3.5.md.
 - Risks seen: (a) yield drops to about 0.7 valid clips per episode, so run A may give about 35 candidates, enough for a top 20 but with less choice; (b) rule 1 can conflict with the cliff: one v3 clip opens on the episode's strongest line and then runs on to a weaker closing beat; (c) one v3 clip is 54.4 s with a slow middle, a case for the future "slow middle → jump-cut" rule. The judge and ranker should catch (b) and (c).
 - Reversible?: Yes (prompt versioned; the cache key includes the version).
+
+## D-036: Judge design: first-3-seconds marker, batch and retry rules, brand-safety flag only
+- Date: 2026-11-07 · Owner: Claude (proposed) · Status: Proposed
+- Context: TECH_SPEC §4.5 fixes the rubric and fields but not how the judge knows what "the first 3 s" are, or what to do when a batch reply is incomplete. Harshit (CP-2): score hook STRENGTH in the first 3 s; flag strikes and torture, don't exclude.
+- Decision: (1) lines that start in the first 3 s of the clip are marked `>>` in the excerpt, and the hook anchors score what is there (5 = strike/slap/shocking reveal inside 3 s, 3 = the big moment comes later). (2) Batches of 3 (config `judge.batch_size`; ~4.4k prompt tokens for 2 clips, so 3 fit under 8k tokens/minute). (3) A skipped clip is re-judged alone; a failed batch is retried clip by clip; still unscored → manifest error, not ranked, never given a default score. (4) graphic_violence carries no penalty; it adds "Brand-safety check before posting" to the posting note. (5) Qwen `<think>` text is stripped before JSON extraction.
+- Alternatives: no marker (the judge would score the best line anywhere); penalise violence (would bury the strongest hooks, against Harshit's call); default scores for unscored clips (fabrication).
+- Reversible?: Yes.
+
+## D-037: Ranker details: greedy diversity, skip log, tie-break, code-written posting note
+- Date: 2026-11-07 · Owner: Claude (proposed) · Status: Proposed
+- Context: TECH_SPEC §4.6 gives the formula and caps but not the algorithm, tie-breaks or the rationale wording.
+- Decision: scores normalised as (s − 1)/4; penalties from builder flags and judge risk_flags (only the keys in `rank.penalty`). Greedy diversity: at each position, take the highest promo that breaks no cap; a skipped promo is recorded once (rank, reason, final position). If every remaining promo breaks a cap, order is kept rather than leaving gaps. Ties break on hook, cliff, then id. posting_rationale is one sentence from the scores ≥ 4 / ≤ 2, the early-episode and sweet-spot bonuses, and flags. `rank.llm_rationale` stays false.
+- Reversible?: Yes (weights and caps in config; changing a weight needs a decision entry).
+
+## D-038: Run orchestration: keep going on failure, write each stage early, `--episodes`, arcs deferred
+- Date: 2026-11-07 · Owner: Claude (proposed) · Status: Proposed
+- Context: Run A is ~1 hour of free-tier calls; one 429 or bad reply must not lose the run.
+- Decision: a failed episode (proposer) or batch (judge) is logged in `manifest.errors` and the run continues; candidates.json/rejected.json are written before judging; the cache makes a rerun of finished work free. `--episodes 1,3,8` limits a run (for run B on the gold episodes). Two runs with the same name in the same minute get a `-2` suffix. Pipeline logic lives in `promo_finder/pipeline.py` so app.py reuses it. Arcs (T4.1) are built last, per Harshit's order; until then the manifest says `"arcs": "not run"`.
+- Reversible?: Yes.

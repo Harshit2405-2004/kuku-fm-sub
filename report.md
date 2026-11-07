@@ -421,3 +421,65 @@ A running log of every task Claude Code executes, in order. A new session must b
 **AI mistakes caught:** ai_log #8, #9
 **Open issues / risks:** v3 yields about 0.7 clips per episode (run A may give about 35 candidates). Rule 1 can make a clip open on its best line and end weaker (D-035). For later (Harshit, CP-2 D): "slow middle → jump-cut" rule; one v2 clip on a non-gold episode is the example (keep about 26–33 s + 65–78 s). Not built now.
 **Next:** Phase 4: judge → ranker → outputs → run A, then arcs (30-min cap)
+
+### T4.2: Judge (`judge.py`, `prompts/judge.md` judge_v1)  ·  2026-11-07 20:55  ·  status: done
+**Goal:** Score each built clip 1–5 on hook, cliff, standalone, trope_pull and pacing, with reasons before scores, from exactly what the viewer sees.
+**What I did:**
+- judge_v1 prompt: the brief's definition word for word (a test checks it matches docs/BRIEF_COMPLIANCE.md §B, for both prompts); anchored 1–5 rubric. The hook is scored on the STRENGTH of the first 3 s (5 = a strike/slap/shocking reveal inside 3 s; 3 = the big moment arrives later; 2 = a plain question or setup), not on whether a line exists there. "A vow is NOT a cliff." One synthetic worked example.
+- Excerpt = the full compact lines (CAMERA text not shortened) of every block that starts inside each segment, `--- CUT ---` between segments, lines in the first 3 s marked `>>`, and the logline labelled "Editor context, viewer does NOT see this".
+- Batches of 3 (`judge.batch_size` in config). A clip the reply skipped is re-judged alone; a failed batch is retried clip by clip; anything still unscored is reported in the manifest errors, never guessed. Unknown IDs in a reply are ignored.
+- risk_flags ⊂ {needs_context, cliff_may_resolve, graphic_violence, slow_middle, confusing_cut}. graphic_violence is a brand-safety flag only (Harshit, CP-2): no penalty, no exclusion; the posting note says "Brand-safety check before posting".
+- `extract_json` now strips `<think>…</think>` (Qwen-style reasoning text) before looking for the JSON; mock judge added.
+**Files changed:** promo_finder/judge.py, promo_finder/prompts/judge.md, promo_finder/llm.py, promo_finder/mock.py, config.yaml (judge.batch_size), tests/test_judge.py
+**Commands & results:**
+    $ pytest -q tests/test_judge.py → 11 passed
+    real judge smoke (qwen3.8-27b, judge_v1) on the 2 proposer_v3 smoke clips (non-gold episodes 24, 40): 1 call · 4,381 prompt / 430 completion tokens · 1.6 s · 0 errors · no think text in the reply
+      scores (hook, cliff, standalone, trope, pacing): P24-1 (5, 2, 4, 5, 4) [graphic_violence] · P40-1 (4, 2, 2, 3, 3) [needs_context, slow_middle]; text in private/smoke_T3.5.md
+**Decisions:** D-036 (Proposed)
+**AI mistakes caught:** none
+**Open issues / risks:** both smoke clips got cliff 2/5, matching the D-035 risk that rule 1 trades cliff strength for hook strength. Groq qwen is not deterministic at temperature 0 (the cache makes reruns reproducible).
+**Next:** T4.3
+
+### T4.3: Ranker (`rank.py`)  ·  2026-11-07 20:55  ·  status: done
+**Goal:** Final score = weighted judge scores + code bonuses − penalties, then the diversity pass, all from config.
+**What I did:**
+- base = Σ weight × (score − 1)/4; bonuses and penalties exactly as TECH_SPEC §4.6, read from `config.yaml: rank`. Penalties come from the builder's flags (midshot_start/end) and the judge's risk_flags (needs_context, cliff_may_resolve). Each part is stored (base, bonuses, penalties) so a number can be explained.
+- Diversity: greedy. At each position, take the best promo that doesn't break a cap (top 20: max 2 per episode; top 10: max 1 per scene). Scene = the hook block's scene; an arc counts under segment 1 and gets its episode bonus from its earliest episode. Every skip is recorded with rank, reason and where it was placed. If every remaining promo breaks a cap, the order is kept.
+- Ties break on hook, then cliff, then id. Unscored promos are listed, not ranked.
+- posting_rationale: one code-built sentence from the scores, bonuses and flags.
+**Files changed:** promo_finder/rank.py, tests/test_rank.py
+**Commands & results:**
+    $ pytest -q tests/test_rank.py → 17 passed
+**Decisions:** D-037 (Proposed)
+**AI mistakes caught:** none
+**Open issues / risks:** none
+**Next:** T4.4
+
+### T4.4: Output writers (`report.py`)  ·  2026-11-07 20:55  ·  status: done
+**Goal:** Write every TECH_SPEC §7 file into outputs/<YYYYMMDD-HHMM-name>/.
+**What I did:**
+- manifest.json (run id, timestamp, git commit, models, prompt versions, parse stats, counts, per-stage usage, cost from `prices` (null when a price is unknown, never guessed), timings, errors, config snapshot with env var names only), episodes.json, proposals_raw/, judge_raw/ (unedited), candidates.json, rejected.json (builder rejects, duplicates, proposer drops), scored.json, ranked.json (with diversity skips and unscored ids), promos.csv, promos.json, review.md (posting order table, then each promo with scores, posting note and the exact excerpt), run.log.
+- Times are formatted from segment seconds only (format_tc); nothing is read from model text.
+**Files changed:** promo_finder/report.py, promo_finder/pipeline.py
+**Commands & results:** see T4.5
+**Decisions:** D-038 (Proposed)
+**AI mistakes caught:** none
+**Open issues / risks:** arcs.json is not written while arcs are not built (manifest says `"arcs": "not run"`).
+**Next:** T4.5
+
+### T4.5: `run.py` CLI + mock end-to-end test  ·  2026-11-07 20:57  ·  status: done
+**Goal:** One command runs the whole pipeline, with model and endpoint overrides for Kuku's API.
+**What I did:**
+- `run.py --input --config --run-name --out --aliases --episodes --mock --no-cache --model --proposer-model --arc-model --judge-model --api-base --api-key-env`. Logic is in `promo_finder/pipeline.py` so app.py can reuse it.
+- A failed episode or judge batch is logged in the manifest and the run goes on; each stage's files are written as soon as it ends; reruns are free through the cache.
+- `tests/test_pipeline_mock.py`: the synthetic show in mock mode produces every file with a valid schema, segment blocks exist, timecodes match seconds, CSV columns match JSON, and the CLI works with `--episodes`.
+**Files changed:** run.py, promo_finder/pipeline.py, tests/test_pipeline_mock.py
+**Commands & results:**
+    $ pytest -q → 235 passed in 10.45s
+    $ python run.py --input samples/synthetic_show --mock --run-name mockdemo --aliases config/aliases.example.yaml → 3 ranked, 0 errors, 0 s
+    $ git commit → 87512b8 "T4.2-T4.5: judge (judge_v1), ranker, output writers, run.py CLI + mock end-to-end test"
+    run A started 2026-11-07 20:58 IST: run id 20261107-2058-runA, 50 episodes parsed, running 50
+**Decisions:** D-038 (Proposed)
+**AI mistakes caught:** none
+**Open issues / risks:** the first draft of a manifest test was too strict (it rejected the `api_key_env` setting name); the assertion now checks only for key values.
+**Next:** run A finishes → arcs (T4.1, 30-min cap) → CP-3
