@@ -362,3 +362,14 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Alternatives: lower max_tokens in config for everyone (D-030 showed 3000 can be too few for reasoning on some episodes); smaller judge batches (more calls).
 - Consequences: on very long prompts the model gets less room to reason; if it runs out, Groq's json_validate_failed is retried as before and a persistent failure is a logged episode error.
 - Reversible?: Yes.
+
+## D-041: How to finish run A after gpt-oss-120b's daily token quota ran out (needs Harshit)
+- Date: 2026-11-07 · Owner: Harshit (to decide) · Status: Proposed
+- Context: Groq free tier, gpt-oss-120b: 200,000 tokens/day. Run A finished 18/50 episodes (ai_log #11). The 32 left need about 7k tokens each (about 225k), plus the arc call. No billing (Harshit). Deadline: submit by 2026-11-08 17:00 IST.
+- Options:
+  (a) Finish the 32 episodes tonight with a second Groq proposer model that has its own daily quota (e.g. gpt-oss-20b, same family and prompt), after a 1-token check and reading its limits; the manifest records two proposer models. Reruns of the 18 done episodes are free from the cache.
+  (b) Wait for gpt-oss-120b's quota. Whether Groq's daily window is rolling or resets at a fixed time is unverified, so it may not free up before the deadline, and 225k is still over one day's 200k.
+  (c) Ship run A as a partial (18 episodes) and say so plainly; spend the remaining quota on run B (Gemini flash-lite proposer, gold episodes).
+  (d) Groq Dev tier (paid) removes the cap: excluded by Harshit; note it in the doc as the scaling path.
+- Recommendation: (a), then arcs on the full candidate set, then run B on flash-lite as planned.
+- Reversible?: Yes.

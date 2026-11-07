@@ -38,6 +38,7 @@ A running log of every task Claude Code executes, in order. A new session must b
 | 1 Parser | ☑ | CP-1 leftovers | 50/50 eps; 0 unassigned lines; aliases final (0 VERIFY, per-episode override D-026); 51 canonical speakers |
 | 2 Gold | ☑ | T2.2 | 15 rows (12 promo, 1 arc, 2 NONE), 0 errors/warnings; provenance D-033; CSV git-ignored |
 | 3 LLM/propose/build | ☑ | CP-2 decisions | 200 tests; 4 reviewer fixes (D-034); proposer_v3 (D-035); decisions tidied |
+| 4 Judge/rank/outputs/arcs | ◐ at CP-3 (blocked) | run A | 243 tests; judge_v1, ranker, outputs, run.py, arcs (arc_v1); run A PARTIAL 18/50 episodes (gpt-oss daily token quota, D-041) |
 | 4 Arcs/judge/rank/run A | ☐ | | |
 | 5 Eval / run B | ☐ | | |
 | 6 App/deploy | ☐ | | |
@@ -512,3 +513,23 @@ A running log of every task Claude Code executes, in order. A new session must b
 **AI mistakes caught:** ai_log #10
 **Open issues / risks:** judge batches of 3 (about 6k prompt tokens) will now run with max_tokens lowered to about 1,500–1,800; the smoke reply for 2 clips was 430 tokens, so that should be enough.
 **Next:** run A finishes → CP-3
+
+### Run A (full pack, 50 episodes)  ·  2026-11-07 21:03–21:17  ·  status: PARTIAL (blocked by the daily token quota)
+**Goal:** Full run on all 50 episodes: proposer_v3 (gpt-oss-120b) → build → arcs (arc_v1) → judge_v1 (qwen3.8-27b) → rank → outputs.
+**What happened:**
+- Run `outputs/20261107-2103-runA` ran to the end and wrote every output file, but **32 of 50 episodes and the arc call failed** with HTTP 429. 31 episodes and the arc call failed on gpt-oss-120b's **tokens per day** limit: "Limit 200000, Used 197980". Episode 3 failed earlier on the per-minute limit after its 4 retries.
+- 18 episodes completed: 1, 2, 4–16, 19, 24, 40 (3 of them, 6, 24 and 40, from the smoke cache).
+- I never checked the daily token limit before estimating run A (ai_log #11). The full proposer pass needs about 7.0k tokens per episode (this run: 125,491 tokens over 18 episodes), so about 350k for 50, which is over the 200k/day free quota for this model on its own.
+**Commands & results:**
+    $ python run.py --input input/<pack> --config config.yaml --run-name runA → done: outputs/20261107-2103-runA · 864 s wall
+      proposer: 18 calls (9 cache hits) · 85,209 prompt / 40,282 completion tokens · "request too large" step-downs: 6
+      arcs: failed (daily quota) · judge: 7 calls (1 cache hit) · 39,283 prompt / 3,403 completion tokens · 0 judge errors
+      counts: proposed 23 · built 20 · rejected 3 (all duplicates) · scored 20 · ranked 20 · unscored 0 · diversity skips 2 · 15 episodes with a clip
+      ranked: 11 single + 9 jumpcut + 0 arc · 24.0–54.9 s · hook ≤ 3 s: 20/20 · all six checks pass: 17/20
+      judge scores (count per value): hook 5:6 4:10 3:3 2:1 · cliff 5:7 4:3 3:2 2:8 · standalone 5:7 4:9 3:3 2:1
+      risk flags: graphic_violence 5 · needs_context 4 · slow_middle 4
+      errors in manifest: 33 (32 proposer, 1 arc)
+**Decisions:** D-041 (Proposed: how to finish run A; needs Harshit)
+**AI mistakes caught:** ai_log #11
+**Open issues / risks:** run A is not complete. 8 of 20 ranked clips have cliff 2/5 (the D-035 risk). Episode 3's per-minute failure shows the retry wait can still be too short after a size step-down (a minor fix).
+**Next:** CP-3 (blocked: Harshit to choose how to finish run A)
