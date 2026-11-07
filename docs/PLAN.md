@@ -48,6 +48,7 @@ Total: about 4.5–5 hours of Harshit's time, about 6 hours of Claude Code time,
 |---|---|
 | T2.1 | Watch about 10 real ReelShort or DramaBox ads. Write `gold/ad_observations.md` (EVAL_PLAN §1). |
 | T2.2 | Label 12–20 gold promos across about 10 episodes in `gold/gold_labels.csv`, including 2–3 quiet episodes. Pick 3 gold episodes as the **held-out test set** and write their numbers in `gold/holdout.txt`. |
+| T2.2a | 🤖 Tooling (added 2026-11-07): `scripts/make_gold_worksheet.py` writes a neutral worksheet (`private/gold_worksheet.md`: every block, nothing highlighted). Harshit fills in the answer slots, then runs `python scripts/gold_from_worksheet.py --input input/<pack>`, which looks up the times and writes `gold/gold_labels.csv` (errors block the write; lengths outside 20–60 s only warn). Claude never opens the filled worksheet or the CSV before evaluation. |
 | T2.3 | 🔁 Optional: ask a second AI to read the brief's promo definition and critique your rubric anchors. You decide what to keep. |
 
 ## Phase 3: LLM layer, proposer, builder (🤖 about 90 min, can run in parallel with Phase 2)

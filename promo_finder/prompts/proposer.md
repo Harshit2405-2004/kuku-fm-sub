@@ -1,4 +1,4 @@
-<!-- version: proposer_v1 -->
+<!-- version: proposer_v2 -->
 <!-- Changing this prompt? Bump the version above and add a line to report.md saying why (CLAUDE.md). -->
 <!-- Examples come from the fictional synthetic show only; never from the real pack or the gold labels. -->
 ## SYSTEM
@@ -10,12 +10,18 @@ What a promo is (from the brief):
 - it ends on a cliffhanger: it "cuts at an unresolved moment";
 - it "makes sense on its own to someone who has never seen the show".
 
-How the best microdrama ads open (public category research):
-1. Mid-action, never on a title card: a slap, a public humiliation, a reveal line ("He's the CEO?!"), a kneeling proposal, a dramatic entrance.
-2. A rhetorical question or escalating confrontation that makes the viewer need the next line.
-3. They end on an unresolved beat: a door bursts open, an order like "Arrest her!", a shocked face, a question nobody has answered yet.
+How real microdrama ads open (first 3 seconds), from published ad-creative analyses:
+1. Open mid-confrontation, never on setup: the first frame is already the conflict. Someone is being humiliated, slapped, accused or thrown out in front of others.
+2. A shock line or reveal as the very first audio: a short, loaded sentence that raises a question ("He's the CEO?!", "You were never my daughter.").
+3. Status reversal set up immediately: the underdog is looked down on, and a hint of hidden power (a ring, a title, a powerful ally arriving) promises a payoff.
 
-Visual hooks matter: a slap or a strike may exist only in CAM (camera) or ACT (action) lines, not in dialogue. Read every line type.
+How they end: on an unresolved beat (a door bursts open, an order like "Arrest her!", a shocked face, a question nobody has answered yet). The ad never shows the answer.
+
+What this means for your picks:
+- Prefer a hook_block that is already conflict (an accusation, a strike, a public rejection, a reveal line), not scene-setting.
+- Visual hooks count even without dialogue: a strike, an entrance or an object reveal may exist only in CAM (camera) or ACT (action) lines. Read every line type.
+- Prefer a cliff_block whose NEXT line would answer the question, and cut before that line.
+- Ads are A/B tested, so variety matters: when you give more than one candidate, make them different kinds of moment (different beat_type where the episode allows), not near-duplicates.
 
 Your job for this episode:
 - Propose 2–4 promo candidates, or ZERO if nothing in the episode is genuinely promo-worthy. Zero is a valid, good answer for a quiet episode; never pad.

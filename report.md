@@ -36,8 +36,8 @@ A running log of every task Claude Code executes, in order. A new session must b
 |---|---|---|---|
 | 0 Setup | ☑ | T0-fix | venv 3.13, git init, kit + doc fixes committed (fc4c4b7). Deadline set at CP-1 leftovers. |
 | 1 Parser | ☑ | CP-1 leftovers | 50/50 eps; 0 unassigned lines; aliases final (0 VERIFY, per-episode override D-026); 51 canonical speakers |
-| 2 Gold | ☐ | | Harshit |
-| 3 LLM/propose/build | ◐ T3.1–T3.4 done | CP-1 leftovers | 150 tests; proposer reasoning_effort=low (D-027); T3.5 waits for "Gold labels done" |
+| 2 Gold | ◐ tooling ready | T2.2a | Worksheet in private/gold_worksheet.md (10 eps, 780 blocks); holdout written; Harshit labelling |
+| 3 LLM/propose/build | ◐ CP-2 pending | T3.5 | 168 tests; proposer_v2; smoke run done (details private); **blocked: Gemini free tier = 20 req/day (D-029)** |
 | 4 Arcs/judge/rank/run A | ☐ | | |
 | 5 Eval / run B | ☐ | | |
 | 6 App/deploy | ☐ | | |
@@ -295,3 +295,44 @@ A running log of every task Claude Code executes, in order. A new session must b
 **AI mistakes caught:** ai_log #4: the alias draft merged two characters under one descriptive label (and the AI-written pack notes had guessed a third, also wrong). Caught by the evidence sheet; the final call was Harshit's.
 **Open issues / risks:** (1) 5 named speaker labels that aren't in aliases.yaml are not checked by leak_check (it reads names from aliases.yaml + keywords only). See the chat summary; Harshit to decide whether to add them as keywords. (2) D-027 rests on 3 synthetic episodes; re-check on real episodes at T3.5. (3) Approval pending: D-021 to D-027.
 **Next:** T3.5, blocked on "Gold labels done" + the gold episode numbers.
+
+### T2.2a: Gold-label tooling (worksheet + converter) + holdout  ·  2026-11-07  ·  status: done
+**Goal:** Build everything around Harshit's hand-labelling without suggesting any moments (D-028).
+**What I did:**
+- `gold/ad_observations.md` filled with Harshit's secondary-research notes (public sources, tracked); `gold/holdout.txt` = 3 episodes (git-ignored).
+- `scripts/make_gold_worksheet.py`: a neutral worksheet with every block in file order, scene markers, CAMERA lines cut to 70 characters, a 6-line rules header and empty answer slots. Wrote `private/gold_worksheet.md` (10 episodes, 780 blocks).
+- `scripts/gold_from_worksheet.py`: block IDs → times from the parsed pack → `gold/gold_labels.csv` (EVAL_PLAN §1). Errors block the write; lengths outside 20–60 s warn; it never overwrites without --force.
+- 18 tests on the synthetic show. They were written after the code (not test-first), so I ran a mutation check: 4 deliberate bugs, each caught by at least 1 test.
+- Dry run on the **blank** worksheet (before Harshit filled it): 0 errors, 10 "no picks" warnings, output to the scratchpad and not kept. I haven't opened the filled worksheet or the CSV.
+**Files changed:** scripts/{make_gold_worksheet,gold_from_worksheet}.py, tests/test_gold_worksheet.py, gold/ad_observations.md, docs/PLAN.md (T2.2a). Private: private/gold_worksheet.md, gold/holdout.txt.
+**Commands & results:**
+    $ pytest -q tests/test_gold_worksheet.py → 18 passed in 1.89s
+    mutation check: order check off → 1 failed · length warning off → 1 failed · segment end uses start → 2 failed · template lines parsed → 11 failed
+    $ python scripts/make_gold_worksheet.py --input input/<pack> --episodes 1,3,8,12,17,18,27,31,42,45 --out private/gold_worksheet.md → 10 episodes, 780 blocks
+**Decisions:** D-028 (Proposed)
+**AI mistakes caught:** none
+**Open issues / risks:** none
+**Next:** T3.5
+
+### T3.5: proposer_v2 + smoke test on 3 non-gold episodes  ·  2026-11-07  ·  status: partial (quota)
+**Goal:** proposer_v2 with the gold/ad_observations.md patterns; real proposer on 3 non-gold episodes; details private.
+**What I did:**
+- **Prompt change proposer_v1 → proposer_v2 (why):** v1's opening patterns came from generic category research; v2 uses the 3 hook patterns, the ending rule and the 4 "implications" from gold/ad_observations.md: hook must already be conflict, visual hooks count, cut before the answer, varied beat types. The worked example is unchanged.
+- Smoke test on 3 non-gold episodes (an early, a middle and a late one; none held out), proposer_v2, `reasoning_effort: low` as configured. Then the D-027 comparison against the default setting. Both cut short by the Gemini daily quota.
+- Details (timestamps, hook/cliff text, reasoning) are **only** in private/smoke_T3.5.md, not shown to Harshit until "Gold labels done".
+**Files changed:** promo_finder/prompts/proposer.md (v2), tests/test_propose.py (version). Private: private/smoke_T3.5.md. Run: outputs/smoke_T3.5_20261107_192614/ (smoke.json + raw replies, unedited).
+**Commands & results (counts only):**
+    $ pytest -q → 168 passed
+    smoke, low: 3 calls, 0 cache hits · prompt 15,536 / completion 797 tokens · 3 proposals → 1 built (all checks pass), 2 rejected too_short, 0 invalid IDs
+    D-027 check, default, 1 episode: 2 calls (1 JSON repair, first reply ~3,982 completion tokens) · 2 proposals → 2 built, 0 rejected
+    grid: 1 more cell ran (default, 1 episode: 0 proposals); 4 cells NOT RUN: Gemini HTTP 429, free tier 20 requests/day/model, retryDelay 64822s
+    Groq live headers: 1000 requests/day, 8000 tokens/min for gpt-oss-120b and qwen3.8-27b
+**Decisions:** D-027 updated (low not recommended any more), D-029 (model plan for the quota, Proposed, blocks Phase 4)
+**AI mistakes caught:** ai_log #5 (D-027 recommendation didn't hold on real episodes), #6 (default model chosen without checking the daily quota; 12 calls spent on experiments)
+**Open issues / risks:** (1) Phase 4 is blocked until D-029 is decided. (2) Before any Groq run, the 429 backoff must honour retry-after (the TPM window is 60 s; our backoff sums to 30 s). (3) In chat, Claude mentioned per-episode proposal and build counts (no moments, timestamps or text) before "Gold labels done", against Harshit's instruction; noted here for honesty.
+**Next:** CP-2 (after "Gold labels done")
+
+### CP-2 reached (waiting)  ·  2026-11-07
+**Summary for Harshit:** gold tooling ready; proposer_v2 written; smoke details in private/smoke_T3.5.md (open after you say "Gold labels done").
+**Please review:** private/smoke_T3.5.md (hook in the first 3 s? cliff unresolved?), promo_finder/prompts/proposer.md (v2), D-029 (model plan), D-027 update.
+**Questions / proposed decisions awaiting approval:** D-021 to D-029; D-029 is blocking.

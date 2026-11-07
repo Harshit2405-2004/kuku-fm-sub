@@ -54,7 +54,7 @@ class Fake:
 
 def test_prompt_has_version_and_no_unfilled_placeholders(episodes):
     version, _ = load_prompt("proposer")
-    assert version == "proposer_v1"
+    assert version == "proposer_v2"
     messages = build_messages(episodes[3], None)
     assert [m["role"] for m in messages] == ["system", "user"]
     assert "[E03-B011 00:13.0–00:14.8]" in messages[1]["content"]
