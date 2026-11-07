@@ -35,7 +35,7 @@ A running log of every task Claude Code executes, in order. A new session must b
 | Phase | Status | Last task | Notes |
 |---|---|---|---|
 | 0 Setup | ☑ | T0-fix | venv 3.13, git init, kit + doc fixes committed (fc4c4b7). Deadline still TBD. |
-| 1 Parser | ☑ (aliases pending) | CP-1 fixes | 89 tests; 50/50 eps; 0 unassigned lines; alias corrections not yet received |
+| 1 Parser | ☑ (aliases pending) | CP-1 fixes | 89 tests; 50/50 eps; 0 unassigned lines; alias evidence sheet ready (private/alias_evidence.md), awaiting Harshit's decision |
 | 2 Gold | ☐ | | Harshit |
 | 3 LLM/propose/build | ◐ T3.1–T3.4 done | T3.4 | 142 tests; T3.5 waits for "Gold labels done" |
 | 4 Arcs/judge/rank/run A | ☐ | | |
@@ -238,3 +238,34 @@ A running log of every task Claude Code executes, in order. A new session must b
 **AI mistakes caught:** none by the runtime model (0 invalid IDs). Note: the E03 result is not evidence of quality.
 **Open issues / risks:** About 2.3k completion tokens per episode (hidden reasoning), so a full run is about 120k completion tokens; check the free-tier daily token quota. Waiting for "Gold labels done" before T3.5 (smoke test on 3 non-gold real episodes) and proposer_v2 (ad_observations patterns).
 **Next:** T3.5 (blocked on Harshit)
+
+### Session handoff: alias evidence sheet + full state  ·  2026-11-07  ·  status: paused, waiting on Harshit
+**Goal:** Record the full current state so a fresh session (after /clear) can resume from this file alone.
+**What I did this session (since T3.4):**
+- Built the alias evidence sheet for every VERIFY line in `config/aliases.yaml`: 7 raw labels, 91 speaking blocks. It lists episodes, the first 3 appearances with file and line numbers, name mentions, co-occurring shots, and a proposed answer per label. The sheet is in `private/alias_evidence.md`, which is git-ignored. `aliases.yaml` is **unchanged**.
+- Result: 1 draft mapping is wrong for 2 blocks in one early episode. That label is used for two different characters across the pack. 1 previously unmapped label now has a proposed mapping. 2 unmapped labels should stay separate characters. 3 draft mappings are kept, 2 of them marked "likely, not proven". The details (names) are only in the private sheet.
+- Proposed fix needing Harshit's choice: (a) keep the global mapping and accept 2 mislabelled blocks, or (b) add a per-episode alias override (`"E02:<LABEL>": <name>`) in `aliases.canonical_speaker`, with a test and a new decision ID. Claude leans towards (b).
+**Files changed:** report.md (this entry). Private only: private/alias_evidence.md (new, git-ignored).
+**Commands & results:**
+    $ pytest -q → 142 passed in 13.28s
+    $ git check-ignore -v private/alias_evidence.md → .gitignore:5:private/
+**Decisions:** none new (the override, if chosen, gets a new D-ID)
+**AI mistakes caught:** Claude's T1.3 alias draft mapped one descriptive label to a single character, but it covers two. This was caught by building the evidence sheet. It goes in ai_log.md (generic) and private/ai_log_details.md (names) once Harshit decides.
+**Open issues / risks:** none new
+
+**FULL STATE FOR RESUME**
+- Done and committed:
+  - Phase 0 (fc4c4b7). Phase 1 T1.1–T1.4 + CP-1 + CP-1 fixes (25d483d…037a437).
+  - Phase 3: T3.1 model IDs (8bba0d4), T3.2 LLM layer (f6bb07d), T3.3 cut builder (ce7e699), T3.4 proposer v1 + mock (ec1734a).
+  - T3.2 is complete, nothing outstanding:
+    - config.yaml + `config.apply_overrides` (per-stage model, api_base, key env, --mock, --no-cache);
+    - `cache.py` (sha256 key over model + prompt_version + messages + schema; atomic writes);
+    - `llm.call_llm`: mock → cache → API with backoff on 408/429/5xx; drops response_format on a 400; one JSON repair; caches only valid replies;
+    - `summarize_usage`; tests in tests/test_config.py and tests/test_llm.py.
+- Tests: 142 passed. Nothing pushed (pushing is Harshit's job; run `python scripts/leak_check.py --pre-push` first).
+- Waiting on Harshit:
+  1. Alias decisions (see private/alias_evidence.md), including option (a) or (b) above. Then: edit aliases.yaml, diff it against the draft, and log in ai_log (generic) + private/ai_log_details.md.
+  2. Leak-keyword changes and the deadline. Both were left as template placeholders at CP-1.
+  3. "Gold labels done" + the gold episode numbers. Then: read `gold/ad_observations.md` ONLY (never gold_labels.csv), write proposer_v2, and run the T3.5 smoke test on 3 non-gold real episodes (details → private/smoke_T3.5.md, counts → here). Then /checkpoint CP-2 and STOP.
+  4. Approval of D-021 through D-025 (Proposed).
+- Next task: T3.5 (blocked). Do not start Phase 4 before CP-2.
