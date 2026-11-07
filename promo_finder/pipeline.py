@@ -7,6 +7,7 @@ and the LLM cache makes a rerun of the finished stages free.
 
 from __future__ import annotations
 
+import copy
 import json
 import logging
 import subprocess
@@ -39,6 +40,16 @@ def _git_commit() -> str | None:
         return None
 
 
+def _proposer_cfg_for(cfg: dict, ep: int) -> dict:
+    """cfg with the proposer replaced for episodes listed in cfg['episode_proposers'] (a mid-run host switch)."""
+    override = (cfg.get("episode_proposers") or {}).get(ep)
+    if not override:
+        return cfg
+    new = copy.deepcopy(cfg)
+    new["models"]["proposer"].update(override)
+    return new
+
+
 def _config_snapshot(cfg: dict) -> dict:
     """The config as run, minus run-time bookkeeping. It holds env var NAMES only, never key values."""
     return {k: v for k, v in cfg.items() if not k.startswith("_")}
@@ -46,18 +57,27 @@ def _config_snapshot(cfg: dict) -> dict:
 
 def run_pipeline(input_path: Path | str, cfg: dict, run_name: str, out_root: Path | str = "outputs",
                  aliases_path: Path | str | None = "config/aliases.yaml", episodes_filter: list[int] | None = None,
-                 completion_fn: Callable | None = None, progress: Callable[[str, int, int], None] | None = None) -> Path:
-    """Run every stage and return the run directory. Errors in one episode or batch are logged and the run goes on."""
+                 completion_fn: Callable | None = None, progress: Callable[[str, int, int], None] | None = None,
+                 reuse_dir: Path | str | None = None) -> Path:
+    """Run every stage and return the run directory. Errors in one episode or batch are logged and the run goes on.
+
+    reuse_dir: continue in an existing run folder (finished episodes come from the LLM cache, files are rewritten).
+    """
     started = time.time()
-    run_id = make_run_id(run_name, started)
-    run_dir = Path(out_root) / run_id
-    n = 2
-    while run_dir.exists():          # two runs with the same name in one minute
-        run_dir = Path(out_root) / f"{run_id}-{n}"
-        n += 1
-    run_id = run_dir.name
-    run_dir.mkdir(parents=True)
-    handler = logging.FileHandler(run_dir / "run.log", encoding="utf-8")
+    if reuse_dir:
+        run_dir = Path(reuse_dir)
+        run_id = run_dir.name
+        run_dir.mkdir(parents=True, exist_ok=True)
+    else:
+        run_id = make_run_id(run_name, started)
+        run_dir = Path(out_root) / run_id
+        n = 2
+        while run_dir.exists():          # two runs with the same name in one minute
+            run_dir = Path(out_root) / f"{run_id}-{n}"
+            n += 1
+        run_id = run_dir.name
+        run_dir.mkdir(parents=True)
+    handler = logging.FileHandler(run_dir / "run.log", encoding="utf-8", mode="a")
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
     logging.getLogger().addHandler(handler)
     if logging.getLogger().level > logging.INFO:
@@ -92,9 +112,12 @@ def _run(input_path, cfg, run_id, run_dir, aliases_path, episodes_filter, comple
     rejected: list[dict] = []
     dropped: list[dict] = []
     proposed_per_episode: dict[int, int] = {}
+    episode_models: dict[int, str] = {}      # which model served each episode (manifest)
     for i, n in enumerate(todo, 1):
+        ep_cfg = _proposer_cfg_for(cfg, n)
+        episode_models[n] = ep_cfg["models"]["proposer"]["model"]
         try:
-            props, drop = propose_episode(episodes[n], cast, cfg, usage, raw_dir=run_dir / "proposals_raw",
+            props, drop = propose_episode(episodes[n], cast, ep_cfg, usage, raw_dir=run_dir / "proposals_raw",
                                           completion_fn=completion_fn)
         except Exception as error:
             log.error("E%02d: proposer failed: %s", n, error)
@@ -129,7 +152,7 @@ def _run(input_path, cfg, run_id, run_dir, aliases_path, episodes_filter, comple
             arcs, arc_rejected = propose_arcs(candidates, episodes, cfg, usage, raw_path=run_dir / "arcs_raw.json",
                                               completion_fn=completion_fn)
             candidates += arcs
-            rejected += [{"reason": f"arc_{r['reason']}", **r} for r in arc_rejected]
+            rejected += [{**r, "reason": f"arc_{r['reason']}"} for r in arc_rejected]
             arcs_status = f"{len(arcs)} built, {len(arc_rejected)} rejected"
         except Exception as error:
             log.error("arcs failed: %s", error)
@@ -167,6 +190,7 @@ def _run(input_path, cfg, run_id, run_dir, aliases_path, episodes_filter, comple
         "arcs": arcs_status,
         "episodes_parsed": len(episodes),
         "episodes_run": todo,
+        "proposer_model_by_episode": {f"E{n:02d}": m for n, m in episode_models.items()},
         "parse_stats": pack_stats(all_episodes),
         "parse_warnings": len(parse_warnings),
         "counts": {"proposed": sum(proposed_per_episode.values()), "dropped_by_proposer": len(dropped),

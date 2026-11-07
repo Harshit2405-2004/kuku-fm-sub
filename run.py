@@ -34,7 +34,24 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--judge-model")
     p.add_argument("--api-base", help="OpenAI-compatible endpoint URL for the overridden stages")
     p.add_argument("--api-key-env", help="name of the env var holding that endpoint's key")
+    p.add_argument("--run-dir", help="continue in this existing run folder (finished episodes come from the cache)")
+    p.add_argument("--episode-proposer", action="append", default=[], metavar="EPISODES=MODEL",
+                   help="proposer model for some episodes only, e.g. '3,17-23=groq/openai/gpt-oss-20b' (repeatable)")
     return p.parse_args(argv)
+
+
+def parse_episode_proposers(specs: list[str], base: dict) -> dict[int, dict]:
+    """'3,17-23=model' → {3: {...}, 17: {...}, ...}. The api_base / key env stay the base proposer's."""
+    out: dict[int, dict] = {}
+    for spec in specs:
+        eps, _, model = spec.partition("=")
+        if not model:
+            raise SystemExit(f"--episode-proposer needs EPISODES=MODEL, got {spec!r}")
+        for part in eps.split(","):
+            lo, _, hi = part.partition("-")
+            for n in range(int(lo), int(hi or lo) + 1):
+                out[n] = {"model": model}
+    return out
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -47,8 +64,9 @@ def main(argv: list[str] | None = None) -> int:
                           arc_model=args.arc_model, judge_model=args.judge_model, api_base=args.api_base,
                           api_key_env=args.api_key_env, no_cache=args.no_cache, mock=args.mock)
     episodes = [int(x) for x in args.episodes.split(",")] if args.episodes else None
+    cfg["episode_proposers"] = parse_episode_proposers(args.episode_proposer, cfg["models"]["proposer"])
     run_dir = run_pipeline(args.input, cfg, args.run_name, out_root=args.out, aliases_path=args.aliases,
-                           episodes_filter=episodes)
+                           episodes_filter=episodes, reuse_dir=args.run_dir)
     print(f"done: {run_dir}")
     return 0
 
