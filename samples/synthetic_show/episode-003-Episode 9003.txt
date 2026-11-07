@@ -1,0 +1,185 @@
+EPISODE NUMBER: Episode 3
+EPISODE LOGLINE: Mara learns her aunt sold the family house, and Ellis asks the question that turns the accusation around.
+CONTINUITY NOTES: Same night as episode 2. The deed Vera hid is revealed.
+
+--- SCRIPT START ---
+
+SCENE 01
+Scene heading: INT. HARBOR INN – NIGHT
+Scene start: 00:00.00
+Scene end: 00:52.00
+
+Actions and dialogue:
+
+**CAMERA:**
+Start: (00:00.00) | End: (00:04.00)
+Establishing shot of the inn at dusk.
+
+**SOUND FX:**
+Start: (00:00.50) | End: (00:01.50)
+A bell over the door rings.
+
+**CAMERA:**
+Start: (00:04.00) | End: (00:07.00)
+Mara walks along the hallway, reading a letter.
+
+**ACTION:**
+Start: (00:04.50) | End: (00:06.50)
+She stops at a framed map of the harbor.
+
+**CAMERA:**
+Start: (00:07.00) | End: (00:09.50)
+Close-up on the map.
+
+**MARA (Muttering):**
+Start: (00:07.50) | End: (00:09.00)
+"Plot seven. Our house."
+
+**CAMERA:**
+Start: (00:09.50) | End: (00:12.00)
+Mara turns toward the parlor door.
+
+**SOUND FX:**
+Start: (00:10.00) | End: (00:11.00)
+Muffled laughter from the parlor.
+
+**ACTION:**
+Start: (00:10.50) | End: (00:12.00)
+Mara pushes the parlor door open.
+
+**CAMERA:**
+Start: (00:12.00) | End: (00:15.50)
+Close-up: Mara freezes at the door, an envelope in her hand.
+
+**MARA (Stunned, Quiet):**
+Start: (00:13.00) | End: (00:14.80)
+"You sold the house?"
+
+**CAMERA:**
+Start: (00:15.50) | End: (00:19.00)
+Vera turns, smiling coldly.
+
+**VERA (Cold):**
+Start: (00:16.00) | End: (00:18.50)
+"It was never yours to keep."
+
+**CAMERA:**
+Start: (00:19.00) | End: (00:23.00)
+Two-shot: Mara steps closer.
+
+**MARA (Shaking):**
+Start: (00:19.50) | End: (00:22.00)
+"Mother's will left it to me."
+
+**CAMERA:**
+Start: (00:23.00) | End: (00:27.00)
+Close-up on Vera.
+
+**VERA (Smug):**
+Start: (00:23.50) | End: (00:26.50)
+"Wills can be lost. Deeds cannot."
+
+**CAMERA:**
+Start: (00:27.00) | End: (00:31.00)
+Insert: the deed, signed and stamped.
+
+**ACTION:**
+Start: (00:27.50) | End: (00:29.00)
+Vera waves the signed deed.
+
+**SOUND FX:**
+Start: (00:29.00) | End: (00:30.00)
+The fire crackles.
+
+**CAMERA:**
+Start: (00:31.00) | End: (00:35.00)
+Mara reaches for the deed; Vera pulls it away.
+
+**MARA (Desperate):**
+Start: (00:31.50) | End: (00:34.00)
+"Then I'll buy it back."
+
+**CAMERA:**
+Start: (00:35.00) | End: (00:39.00)
+Close-up on Vera laughing.
+
+**VERA (Mocking):**
+Start: (00:35.50) | End: (00:38.50)
+"With what? You own nothing."
+
+**CAMERA:**
+Start: (00:39.00) | End: (00:42.50)
+Wide shot: the parlor, a figure in the doorway behind them.
+
+**SOUND FX:**
+Start: (00:40.00) | End: (00:41.00)
+Footsteps on floorboards.
+
+**ACTION:**
+Start: (00:41.00) | End: (00:42.50)
+Ellis steps forward into the lamplight.
+
+**MARA (Startled):**
+Start: (00:41.50) | End: (00:42.30)
+"Ellis?"
+
+**CAMERA:**
+Start: (00:42.50) | End: (00:47.00)
+Ellis steps out of the shadows.
+
+**ELLIS (Low):**
+Start: (00:44.00) | End: (00:46.20)
+"Then who signed the deed?"
+
+**VERA (Pale):**
+Start: (00:47.40) | End: (00:49.00)
+"...You."
+
+**CAMERA:**
+Start: (00:47.00) | End: (00:52.00)
+Close-up: Mara stares at her own signature.
+
+**MARA (Whisper):**
+Start: (00:49.50) | End: (00:51.50)
+"I never signed anything."
+
+SCENE 02
+Scene heading: EXT. HARBOR – NIGHT
+Scene start: 00:52.00
+Scene end: 01:52.00
+
+Actions and dialogue:
+
+**CAMERA:**
+Start: (00:52.00) | End: (01:00.00)
+Wide shot: Mara runs out onto the rain-soaked pier.
+
+**SOUND FX:**
+Start: (00:52.50) | End: (00:54.00)
+Heavy rain.
+
+**CAMERA:**
+Start: (01:00.00) | End: (01:15.00)
+Medium shot: Ellis follows, holding out a coat.
+
+**ELLIS (Gentle):**
+Start: (01:02.00) | End: (01:05.00)
+"Someone forged your hand. I can prove it."
+
+**CAMERA:**
+Start: (01:15.00) | End: (01:30.00)
+Close-up on Mara, rain and tears.
+
+**MARA (Fierce):**
+Start: (01:16.00) | End: (01:19.00)
+"Then prove it. Tonight."
+
+**CAMERA:**
+Start: (01:30.00) | End: (01:52.00)
+Wide shot: the two of them walk into the fog.
+
+**ACTION:**
+Start: (01:32.00) | End: (01:36.00)
+A lantern goes out behind them.
+
+--- SCRIPT END ---

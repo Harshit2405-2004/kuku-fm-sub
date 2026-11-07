@@ -65,3 +65,20 @@ A running log of every task Claude Code executes, in order. A new session must b
 **AI mistakes caught:** truncated grep missed a plot line (ai_log #1)
 **Open issues / risks:** Deadline not yet provided (placeholders in PLAN, INSTRUCTIONS, status board). Leak keyword list awaits review at CP-1.
 **Next:** T1.1
+
+### T1.1: Synthetic show  ·  2026-11-07  ·  status: done
+**Goal:** A fictional 3-episode pack in the exact real format, for tests, demos and prompt examples.
+**What I did:**
+- Wrote `samples/synthetic_show/` ("The Locket", original characters) with the edge cases listed in its README.
+- Ep 3 reproduces PROCESS_GUIDE Processes 1–3 block for block (E03-B010/B011/B029–B031 at the guide's times), so build tests can use real parsed data.
+- Added `config/aliases.example.yaml` (format doc, synthetic names only).
+- Phase plan saved to `docs/phase_plans/phase-1.md`.
+**Files changed:** samples/synthetic_show/*, config/aliases.example.yaml, docs/phase_plans/phase-1.md
+**Commands & results:**
+    $ grep -c per type → ep1 20 (8 CAM, 3 ACT, 2 SFX), ep2 13 (6, 2, 1), ep3 41 (18, 5, 5)
+    $ python scripts/leak_check.py → PASS
+    $ pytest -q → no tests yet (parser is T1.2)
+**Decisions:** none
+**AI mistakes caught:** none
+**Open issues / risks:** none
+**Next:** T1.2

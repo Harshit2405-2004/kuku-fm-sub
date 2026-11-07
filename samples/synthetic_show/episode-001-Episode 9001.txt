@@ -1,0 +1,102 @@
+EPISODE NUMBER: Episode 1
+EPISODE LOGLINE: Soaked and desperate, Mara begs her aunt Vera for her late mother's locket, until a scarred stranger at the inn intervenes.
+CONTINUITY NOTES: First episode. Establishes Vera's control over the harbor inn and introduces the stranger (credited as THE STRANGER until he gives his name).
+
+--- SCRIPT START ---
+
+SCENE 01
+Scene heading: INT. HARBOR INN – NIGHT
+Scene start: 00:00.00
+Scene end: 00:30.00
+
+Actions and dialogue:
+
+**CAMERA:**
+Start: (00:00.00) | End: (00:04.00)
+Wide shot of a rain-soaked harbor inn, lanterns swinging.
+
+**ACTION:**
+Start: (00:01.00) | End: (00:04.00)
+Mara pushes through the door, soaked to the bone,
+clutching a silver locket to her chest.
+
+**SOUND FX:**
+Start: (00:01.50) | End: (00:02.50)
+Thunder rolls.
+
+**CAMERA:**
+Start: (00:04.00) | End: (00:09.00)
+Medium shot: Vera at the bar, counting coins.
+
+**VERA (Cold):**
+Start: (00:05.00) | End: (00:07.00)
+"You're late, and you're dripping on my floor."
+
+**CAMERA:**
+Start: (00:09.00) | End: (00:14.00)
+Close-up on the locket in Mara's trembling hand.
+
+**MARA (Pleading, Breathless):**
+Start: (00:09.50) | End: (00:12.00)
+"Mother left this for me. Not for you."
+
+**CAMERA:**
+Start: (00:14.00) | End: (00:20.00)
+Over-the-shoulder: Vera reaches across the bar.
+
+**ACTION:**
+Start: (00:14.50) | End: (00:16.00)
+Vera yanks the locket from Mara's grip.
+
+**VERA (Mocking):**
+Start: (00:16.00) | End: (00:18.50)
+"Everything in this inn is mine. Including you."
+
+**CAMERA:**
+Start: (00:20.00) | End: (00:30.00)
+Wide shot: a hooded stranger rises from a corner table.
+
+**THE STRANGER (O.S.):**
+Start: (00:21.00) | End: (00:23.00)
+"Give the girl her locket."
+
+**VERA (Startled, O.S.):**
+Start: (00:24.00) | End: (00:25.50)
+"Who said that?"
+
+SCENE 02
+Scene heading: INT. HARBOR INN – CONTINUOUS
+Scene start: 00:30.00
+Scene end: 01:00.00
+
+Actions and dialogue:
+
+**CAMERA:**
+Start: (00:30.00) | End: (00:38.00)
+Close-up: the stranger lowers his hood, revealing a scar.
+
+**SOUND FX:**
+Start: (00:30.50) | End: (00:31.50)
+A chair scrapes.
+
+**THE STRANGER (Calm, Dangerous):**
+Start: (00:32.00) | End: (00:35.00)
+"I said, give it back."
+
+**CAMERA:**
+Start: (00:38.00) | End: (00:46.00)
+Two-shot: Vera hesitates, then drops the locket on the bar.
+
+**MARA (Stunned):**
+Start: (00:40.00) | End: (00:42.00)
+"Who are you?"
+
+**CAMERA:**
+Start: (00:46.00) | End: (01:00.00)
+Extreme close-up: the locket springs open, showing a photo of the stranger.
+
+**ACTION:**
+Start: (00:47.00) | End: (00:50.00)
+Mara stares at the photo, then at the stranger.
+
+--- SCRIPT END ---

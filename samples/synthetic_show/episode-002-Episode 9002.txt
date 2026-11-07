@@ -1,0 +1,73 @@
+EPISODE NUMBER: Episode 2
+EPISODE LOGLINE: At the docks Ellis tells Mara her aunt sold the family boat, while Vera secretly seals a letter about a deed.
+CONTINUITY NOTES: Picks up the next morning. The stranger is now named Ellis. Vera's office scene has no sound effects.
+
+--- SCRIPT START ---
+
+SCENE 01
+SCENE HEADING: EXT. HARBOR DOCKS – DAY
+SCENE START: 00:00.00
+SCENE END: 00:25.00
+
+Actions and dialogue:
+
+**CAMERA:**
+Start: (00:00.00) | End: (00:06.00)
+Wide shot of fishing boats at dawn.
+
+**SOUND FX:**
+Start: (00:00.50) | End: (00:02.00)
+Gulls cry overhead.
+
+**CAMERA:**
+Start: (00:06.00) | End: (00:12.00)
+Medium shot: Ellis coils a rope on the pier.
+
+**ELLIS (Quiet):**
+Start: (00:07.00) | End: (00:09.50)
+"Your aunt sold the boat last night."
+
+**CAMERA:**
+Start: (00:12.00) | End: (00:25.00)
+Close-up on Mara's face.
+
+**MARA (Angry):**
+Start: (00:13.00) | End: (00:15.00)
+"She had no right."
+
+**ACTION:**
+Start: (00:15.50) | End: (00:18.00)
+Mara throws the bill of sale into the sea.
+
+SCENE 02
+SCENE HEADING: INT. VERA'S OFFICE – DAY
+SCENE START: 00:25.00
+SCENE END: 00:50.00
+
+Actions and dialogue:
+
+**CAMERA:**
+Start: (00:25.00) | End: (00:33.00)
+Vera seals a letter with red wax.
+
+**VERA (V.O.):**
+Start: (00:26.00) | End: (00:30.00)
+"If the girl learns about the deed, we lose everything."
+
+**CAMERA:**
+Start: (00:33.00) | End: (00:41.00)
+Insert: the wax seal bears a ship emblem.
+
+**ACTION:**
+Start: (00:34.00) | End: (00:37.00)
+Vera slides the letter under a stack of papers.
+
+**CAMERA:**
+Start: (00:41.00) | End: (00:50.00)
+Wide shot: the office door creaks open behind her.
+
+**MARA (O.S.) (Cold):**
+Start: (00:42.00) | End: (00:44.00)
+"What deed, Aunt Vera?"
+
+--- SCRIPT END ---

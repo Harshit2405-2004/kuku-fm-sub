@@ -1,0 +1,17 @@
+# Speaker alias map: documents the format using the fictional synthetic show.
+# The real show's map lives in config/aliases.yaml, which is git-ignored (character names are confidential).
+# If config/aliases.yaml is missing, the pipeline uses raw speaker labels, title-cased, and logs a warning.
+
+# Raw speaker label as written in the script (upper case, without the (Emotion) part) -> canonical name.
+aliases:
+  MARA: Mara
+  VERA: Vera
+  AUNT VERA: Vera
+  ELLIS: Ellis
+  THE STRANGER: Ellis      # credited by description before he gives his name
+
+# Optional one-line roles, shown to the LLM in the compact view header.
+cast:
+  Mara: young woman fighting her aunt for her inheritance
+  Vera: Mara's controlling aunt, owns the harbor inn
+  Ellis: scarred stranger who takes Mara's side
