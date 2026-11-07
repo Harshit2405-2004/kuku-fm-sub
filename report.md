@@ -581,3 +581,25 @@ Different episodes, so it's indicative, not a controlled comparison. Arc promos 
 **Limitations (reviewer CP-3 items 2–6 left unfixed, Harshit):** duplicate arc picks are not deduped; a crash outside the per-episode/batch handlers leaves no manifest; the mock test lacks arcs_raw.json, an arc row and the keep-going-on-failure path; the judge excerpt drops a dialogue line already playing at a single's start; the lowered max_tokens is not reused on the JSON-repair retry. Also: **run A covers 26 of 50 episodes** and mixes two proposer sizes; qwen's daily tokens can't be read from Groq headers, so the judge ran without that check (it finished).
 **Open issues / risks:** half of the pack is unprocessed; E03, 27, 31, 42, 45 (gold) have no run A output. Free-tier daily token caps (200k/day per Groq model) are the binding limit: about 7k tokens per episode.
 **Next:** run B (D-032), eval, blind sheet
+
+### Run B (D-032) + eval prep (metrics.py, evaluate.py) + blind sheet  ·  2026-11-08 04:50–05:10  ·  status: done
+**Goal:** Run B = swap the proposer family (gemini-3.5-flash-lite) with the same qwen judge on the 10 gold episodes; build the eval tools; evaluate run A and B; make the blind precision sheet.
+**What I did:**
+- Run B `outputs/20261108-0450-runB`: proposer and arc model gemini-3.5-flash-lite (the arc model is not gpt-oss-120b, whose daily quota is spent), judge qwen3.8-27b, prompts unchanged. No daily quota was hit. Episodes 1, 3, 8, 12, 17, 18, 27, 31, 42, 45: all 10 processed.
+- `promo_finder/metrics.py` (temporal IoU for multi-segment promos, strict ≥ 0.5 / lenient ≥ 0.3 or both gold blocks inside, recall, weighted recall, precision@10, Spearman with ties, matched Jaccard) and `evaluate.py` (writes eval_metrics.json and eval_report.md; `--make-blind-sheet`; `--ratings`; `--compare`). Console and report carry counts, gold IDs and numbers only. Gold recall is computed only over gold promos whose episode the run processed; episodes with a proposer error are reported as not processed. 14 new tests, 264 pass.
+- Blind sheet: `gold/precision_ratings.csv` = run A's top 15 (after the D-042 gate), shuffled with a fixed seed, only timestamps, length and the script excerpt (no scores, ranks or IDs); the key is `gold/precision_key.csv`. Both are git-ignored. Rating scale: 2 would post, 1 maybe, 0 no.
+**Commands & results:**
+    $ python run.py ... --run-name runB --episodes 1,3,8,12,17,18,27,31,42,45 --proposer-model gemini/gemini-3.5-flash-lite --arc-model gemini/gemini-3.5-flash-lite --api-key-env GEMINI_API_KEY → done · 243 s
+      proposer: 10 calls · 54,560 / 2,453 tokens · 28 s (propose+build) · arc: 1 call · 1,401 / 91 tokens · 1 arc built · judge: 6 calls · 23,380 / 1,724 tokens · 213 s
+      counts: proposed 12 · built 10 · rejected 3 · scored 10 · ranked 10 · 9 episodes with a clip · errors 1 (a judge batch of 3 failed on qwen's 7,000 input tokens/minute; re-judged clip by clip, 0 unscored)
+    $ python evaluate.py --run outputs/20261107-2103-runA --gold gold/gold_labels.csv → valid 32/32 · episodes processed 26/50
+      gold promos 13; in processed episodes 6 · recall any: strict 2/6, lenient 3/6 · recall@20: strict 1/6, lenient 2/6 · quiet false positives in top 20: 0
+    $ python evaluate.py --run outputs/20261108-0450-runB --gold gold/gold_labels.csv → valid 10/10 · episodes processed 10/10
+      gold promos 13 (all 13 in processed episodes) · recall any: strict 1/13, lenient 5/13 · recall@20: strict 1/13, lenient 5/13 · quiet false positives in top 20: 1
+    top-10 Jaccard (IoU ≥ 0.5) run A vs run B: 0.05 (different episode coverage, so only indicative)
+    $ pytest -q → 264 passed
+**Targets (EVAL_PLAN §2) are MISSED:** recall (any) ≥ 70% and recall@20 ≥ 50% are not met by either run, on strict or lenient matching. Run A's numbers cover only 6 gold promos (5 of the 10 gold episodes). Precision@10 and judge–human Spearman wait for Harshit's ratings.
+**Decisions:** D-032 carried out as accepted (flash-lite quota available; run B not blocked)
+**AI mistakes caught:** none
+**Limitations / risks:** the 6-promo run A recall has very wide uncertainty; run A and run B differ in proposer, coverage and arcs model, so the A/B Jaccard is only indicative; qwen's input-tokens-per-minute cap (7,000) breaks batches of 3 on long excerpts (recovered, but slow, 213 s for 10 clips).
+**Next:** Harshit rates `gold/precision_ratings.csv`, then `python evaluate.py --run outputs/20261107-2103-runA --gold gold/gold_labels.csv --ratings gold/precision_ratings.csv`; CP-3 review; failure gallery
