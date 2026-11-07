@@ -165,3 +165,11 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Alternatives: Fail the whole episode on a bad block (one typo would kill the live demo); keep untimed blocks with guessed times (code would invent timestamps).
 - Consequences: Never crashes on odd input, and every oddity is visible in the warnings. Skipping an untimed block shifts later IDs versus "position in file", which only matters if someone counts blocks by hand.
 - Reversible?: Yes.
+
+## D-019: Compact-view details where TECH_SPEC §4.1 is silent
+- Date: 2026-11-07 · Owner: Claude · Status: Proposed
+- Context: §4.1 gives the block-line format but not scene boundaries, speaker flags or how tokens are counted.
+- Decision: (1) Add a `## SCENE n · heading · start–end` line before each scene, so the model sees where locations change (useful for cuts and the per-scene diversity cap). (2) Speaker shown as canonical name in caps, emotion in (), flags in [] (e.g. `VERA (Startled) [O.S.]`). (3) Timecodes use whole tenths so 59.96 s prints 01:00.0. (4) Tokens estimated as len/4, not `litellm.token_counter`, because the count only budgets calls, and the real per-model count is logged from API usage in Phase 3.
+- Alternatives: No scene lines (the model has to infer scene changes from times); litellm's tokenizer (model-specific, slower, and the estimate is only for planning).
+- Consequences: A few dozen extra tokens per episode. Real token usage still comes from the API response and goes into the manifest (NFR7).
+- Reversible?: Yes.

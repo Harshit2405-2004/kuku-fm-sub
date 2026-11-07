@@ -116,3 +116,19 @@ A running log of every task Claude Code executes, in order. A new session must b
 **AI mistakes caught:** none yet; the alias draft is verified at CP-1
 **Open issues / risks:** One descriptive label probably covers one character across early and late episodes; a global alias map can't split a label by episode. If Harshit finds it's really two people, we need per-episode overrides (a spec change).
 **Next:** T1.4
+
+### T1.4: Compact view + token table  ·  2026-11-07  ·  status: done
+**Goal:** `compact.py`: the one-line-per-block text the LLM reads, a CLI to print an episode, and token counts per episode.
+**What I did:**
+- Tests first (RED: import error), then `format_tc`, `compact_block`, `compact_episode`, `estimate_tokens` and a CLI: `python -m promo_finder.compact --input <pack> --ep N` / `--tokens`.
+- Line format exactly as in TECH_SPEC §4.1 (`[E03-B011 00:13.0–00:14.8] MARA (Stunned, Quiet): "You sold the house?"`), plus scene marker lines and flags (D-019).
+- Token table for the real pack (counts only; uses the draft alias map and cast list).
+**Files changed:** promo_finder/compact.py, tests/test_compact.py
+**Commands & results:**
+    $ pytest -q → (RED) 1 error during collection; then 68 passed in 0.43s
+    $ python -m promo_finder.compact --input input --tokens → 50 episodes; est_tokens min 1327, median 2399, max 3471, total 120540
+    per-episode est_tokens (ep:tokens): 1:2820 2:2377 3:3471 4:3039 5:2156 6:2946 7:1988 8:1944 9:2733 10:1927 11:2695 12:1843 13:2452 14:1833 15:1920 16:2083 17:2465 18:2676 19:2363 20:2328 21:2807 22:2609 23:2230 24:2370 25:2648 26:1992 27:2760 28:2854 29:2412 30:2454 31:2864 32:3274 33:2582 34:3459 35:2346 36:3383 37:2771 38:1861 39:2220 40:2005 41:1975 42:1327 43:2623 44:1757 45:2448 46:2577 47:2386 48:1569 49:2334 50:1584 
+**Decisions:** D-019 (compact-view details, Proposed)
+**AI mistakes caught:** none
+**Open issues / risks:** Proposer input is about 2.4k tokens per episode plus the prompt, well inside free-tier context limits. The whole show (~120k) would fit one long-context call, but D-003 keeps per-episode calls.
+**Next:** CP-1
