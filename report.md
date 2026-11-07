@@ -533,3 +533,21 @@ A running log of every task Claude Code executes, in order. A new session must b
 **AI mistakes caught:** ai_log #11
 **Open issues / risks:** run A is not complete. 8 of 20 ranked clips have cliff 2/5 (the D-035 risk). Episode 3's per-minute failure shows the retry wait can still be too short after a size step-down (a minor fix).
 **Next:** CP-3 (blocked: Harshit to choose how to finish run A)
+
+### CP-3 reached  ·  2026-11-07 21:25  ·  BLOCKED (run A partial)
+**Summary for Harshit:**
+- Built: judge_v1 (verbatim brief definition; hook STRENGTH in the first 3 s; brand-safety flag only), ranker, all output files, run.py CLI, arcs (arc_v1, 2-segment pairs by candidate ID), and a "request too large" fix. 243 tests pass; leak_check PASS.
+- Run A `outputs/20261107-2103-runA`: 18/50 episodes completed, then gpt-oss-120b's free **200k tokens/day** ran out (ai_log #11); arcs failed for the same reason. From the 18 episodes: 20 ranked clips (11 single, 9 jumpcut) from 15 episodes, 24.0–54.9 s, hook ≤ 3 s 20/20, all checks 17/20; cliff scored 2/5 on 8 of 20.
+**Please review:**
+- D-041: how to finish run A (recommend (a), a second Groq proposer model for the remaining 32 episodes, after a quota check).
+- `outputs/20261107-2103-runA/review.md` (top 10 against the scripts; especially whether the cliff 2/5 clips deserve their ranks).
+- `promo_finder/prompts/judge.md` (rubric anchors).
+**Proposed decisions awaiting approval:** D-036, D-037, D-038, D-039 (incl. spec deviations: 0–8 arcs, exactly 2 segments), D-040 (corrects D-030), D-041.
+**Reviewer verdict:** PASS WITH FIXES (0 blocking). Should fix, for your call:
+  (1) pipeline.py:130 the `arc_` reason prefix is overwritten by `**r` (a real bug, a one-line fix);
+  (2) duplicate arc picks are not deduped;
+  (3) a crash outside the per-episode/batch handlers leaves no manifest;
+  (4) the mock test doesn't cover arcs_raw.json, an arc row, or the keep-going-on-failure path;
+  (5) the judge excerpt drops a dialogue line already playing at a single's start (its tail is audible);
+  (6) the lowered max_tokens isn't reused on the JSON-repair retry.
+  Nits: the "moved down" label when nothing moved, a test name, bracket the arc flag expression, arc ID gaps, recovered judge batches counted as errors, stale "arcs: not run" wording in D-038 and T4.4, retry constants in config.
