@@ -3,38 +3,48 @@
 # --judge-model / --api-base / --api-key-env (e.g. Kuku's OpenAI-compatible endpoint: model "openai/<name>").
 
 models:
-  # Model IDs verified on 2026-11-07 with a 1-token LiteLLM call each (D-022). Re-verify on a new day:
-  # free-tier model lists change often.
+  # D-029 (accepted 2026-11-07): Gemini's free tier is 20 requests/day/model, too few for a 50-episode run,
+  # so all three stages run on Groq (1000 requests/day and 8000 tokens/minute PER MODEL, read from Groq's
+  # response headers on 2026-11-07). Proposer/arc and judge are different families (OpenAI vs Qwen, D-006).
+  # Groq counts actual prompt + completion tokens against the 8k/min, not max_tokens (D-030).
   proposer:
-    model: gemini/gemini-3.5-flash
-    api_base: null
-    api_key_env: GEMINI_API_KEY
-    temperature: 0
-    max_tokens: 4000
-    # Hidden "thinking" budget: minimal | low | medium | high, or null for the provider default.
-    # LiteLLM maps it per provider (Gemini 3: thinkingLevel). An endpoint that rejects it is retried
-    # without it. low cut completion tokens by 75% on the synthetic show with no loss in clip validity (D-027).
-    reasoning_effort: low
-  arc:
-    model: gemini/gemini-3.5-flash
-    api_base: null
-    api_key_env: GEMINI_API_KEY
-    temperature: 0
-    max_tokens: 4000
-  judge:
-    # Different model family from the proposer, to reduce self-preference bias (D-006).
     model: groq/openai/gpt-oss-120b
     api_base: null
     api_key_env: GROQ_API_KEY
     temperature: 0
-    max_tokens: 4000
+    max_tokens: 4000     # D-030: reasoning alone used 2,994 tokens on one episode; Groq doesn't reserve max_tokens
+    # Hidden "thinking" budget: minimal | low | medium | high, or null for the provider default.
+    # LiteLLM maps it per provider (Gemini 3: thinkingLevel; gpt-oss takes it as is). Rejected → retried
+    # without it. null = provider default (D-027: "low" gave too-short picks on real episodes).
+    reasoning_effort: null
+  arc:
+    model: groq/openai/gpt-oss-120b
+    api_base: null
+    api_key_env: GROQ_API_KEY
+    temperature: 0
+    max_tokens: 3000
+    reasoning_effort: null
+  judge:
+    # Different model family from the proposer, to reduce self-preference bias (D-006).
+    model: groq/qwen/qwen3.8-27b
+    api_base: null
+    api_key_env: GROQ_API_KEY
+    temperature: 0
+    max_tokens: 3000
+    reasoning_effort: null
 
-concurrency: 2           # parallel LLM calls per stage
+# What the proposer reads (D-031): CAMERA shot text cut to this many characters (null = full text).
+# Saves input tokens under Groq's 8k tokens/minute limit; dialogue, action and SFX lines are never cut.
+proposer_input:
+  camera_max_chars: 70
+
+concurrency: 1           # parallel LLM calls per stage; 1 because one call is ~half of Groq's 8k tokens/minute
 rate_limit:
   rpm: 10                # client-side cap per stage; free tiers throttle hard
 retries:
   max_attempts: 5        # on 429 / 5xx, exponential backoff
-  backoff_base_s: 2
+  backoff_base_s: 2       # used only when the provider gives no wait hint
+  max_wait_s: 120         # a 429 asking to wait longer than this (a daily quota) fails at once (D-030)
   json_repair_attempts: 1  # on invalid JSON: retry once with the validation error appended
 
 cache_dir: .cache/llm
@@ -45,6 +55,7 @@ cache_dir: .cache/llm
 prices:
   gemini/gemini-3.5-flash: {input: 0, output: 0}
   groq/openai/gpt-oss-120b: {input: 0, output: 0}
+  groq/qwen/qwen3.8-27b: {input: 0, output: 0}
   reference_paid: {model: null, input: null, output: null}
 
 build:

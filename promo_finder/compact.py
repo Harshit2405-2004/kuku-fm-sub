@@ -29,8 +29,19 @@ def format_tc(seconds: float) -> str:
     return f"{minutes:02d}:{rest / 10:04.1f}"
 
 
-def compact_block(block: Block) -> str:
+def shorten(text: str, max_chars: int | None) -> str:
+    """Cut text to max_chars, ending in '…' when cut; None = no limit."""
+    if max_chars is None or len(text) <= max_chars:
+        return text
+    return text[:max_chars - 1].rstrip() + "…"
+
+
+def compact_block(block: Block, camera_max_chars: int | None = None) -> str:
     stamp = f"[{block.id} {format_tc(block.start)}–{format_tc(block.end)}]"
+    if block.type == "CAMERA":
+        # Shot descriptions are the longest lines and mostly framing detail; the action that matters
+        # is usually in the first words, so the proposer can read a shortened version (D-031).
+        return f"{stamp} CAM: {shorten(block.text, camera_max_chars)}"
     if block.type in TYPE_PREFIX:
         return f"{stamp} {TYPE_PREFIX[block.type]}: {block.text}"
     who = (block.speaker or block.speaker_raw or "UNKNOWN").upper()
@@ -41,8 +52,11 @@ def compact_block(block: Block) -> str:
     return f'{stamp} {who}: "{block.text}"'
 
 
-def compact_episode(ep: Episode, cast: dict[str, str] | None = None) -> str:
-    """Header lines (episode, logline, continuity, optional cast) then scenes and blocks in file order."""
+def compact_episode(ep: Episode, cast: dict[str, str] | None = None, camera_max_chars: int | None = None) -> str:
+    """Header lines (episode, logline, continuity, optional cast) then scenes and blocks in file order.
+
+    camera_max_chars shortens CAMERA text only (proposer input); the judge always sees full lines.
+    """
     lines = [f"EPISODE {ep.ep} · duration {format_tc(ep.duration)}",
              f"LOGLINE: {ep.logline}",
              f"CONTINUITY: {ep.continuity}"]
@@ -55,7 +69,7 @@ def compact_episode(ep: Episode, cast: dict[str, str] | None = None) -> str:
             s = scenes[block.scene]
             lines.append(f"## SCENE {s.num} · {s.heading} · {format_tc(s.start)}–{format_tc(s.end)}")
             current_scene = block.scene
-        lines.append(compact_block(block))
+        lines.append(compact_block(block, camera_max_chars))
     return "\n".join(lines)
 
 

@@ -224,3 +224,50 @@ def test_endpoint_rejecting_reasoning_effort_is_retried_without_it(cfg):
     assert parsed.block_id == "E03-B011"
     assert "reasoning_effort" in fake.calls[0]
     assert "reasoning_effort" not in fake.calls[1]
+
+
+# --- retry-after (D-030): wait as long as the provider says, not a fixed backoff
+
+class RateLimited(HTTPError):
+    def __init__(self, headers=None, message="rate limited"):
+        super().__init__(429, message)
+        self.litellm_response_headers = headers or {}
+
+
+@pytest.mark.parametrize("headers, message, expected", [
+    ({"retry-after": "7"}, "", 7.5),                                   # plain seconds, + 0.5 s margin
+    ({"x-ratelimit-reset-tokens": "7.66s"}, "", 8.16),                 # Groq TPM window
+    ({"x-ratelimit-reset-tokens": "1m2.5s"}, "", 63.0),
+    ({"x-ratelimit-reset-tokens": "712ms"}, "", 1.212),
+    ({}, "Rate limit reached. Please try again in 12.3s. Need more tokens?", 12.8),  # Groq body text
+    ({"retry-after": "3", "x-ratelimit-reset-tokens": "20s"}, "", 20.5),  # the longest hint wins
+])
+def test_retry_after_hints_are_honoured(cfg, headers, message, expected):
+    fake = FakeCompletion(RateLimited(headers, message), response(GOOD))
+    (parsed, _), _, sleeps = run(cfg, fake)
+    assert parsed.block_id == "E03-B011"
+    assert sleeps == [pytest.approx(expected)]
+
+
+def test_retry_after_longer_than_the_cap_fails_fast(cfg):
+    # A daily quota (Gemini: "retryDelay": "64822s") will not clear within a run: stop, don't sleep for hours.
+    cfg["retries"]["max_wait_s"] = 90
+    fake = FakeCompletion(RateLimited({}, '{"retryDelay": "64822s"}'), response(GOOD))
+    with pytest.raises(HTTPError):
+        run(cfg, fake)
+    assert len(fake.calls) == 1
+
+
+def test_no_hint_falls_back_to_exponential_backoff(cfg):
+    fake = FakeCompletion(RateLimited({}, "slow down"), response(GOOD))
+    (_, _), _, sleeps = run(cfg, fake)
+    assert sleeps == [2]
+
+
+def test_provider_side_json_failure_is_retried(cfg):
+    # Groq returns 400 json_validate_failed when the model ran out of tokens before writing JSON;
+    # it is a generation failure, not a bad request, so another attempt can succeed.
+    err = HTTPError(400, '{"error":{"message":"Failed to validate JSON.","code":"json_validate_failed","failed_generation":""}}')
+    fake = FakeCompletion(err, response(GOOD))
+    (parsed, _), _, sleeps = run(cfg, fake)
+    assert parsed.block_id == "E03-B011" and len(fake.calls) == 2 and sleeps == [2]

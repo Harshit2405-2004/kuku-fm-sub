@@ -37,7 +37,7 @@ A running log of every task Claude Code executes, in order. A new session must b
 | 0 Setup | ☑ | T0-fix | venv 3.13, git init, kit + doc fixes committed (fc4c4b7). Deadline set at CP-1 leftovers. |
 | 1 Parser | ☑ | CP-1 leftovers | 50/50 eps; 0 unassigned lines; aliases final (0 VERIFY, per-episode override D-026); 51 canonical speakers |
 | 2 Gold | ◐ tooling ready | T2.2a | Worksheet in private/gold_worksheet.md (10 eps, 780 blocks); holdout written; Harshit labelling |
-| 3 LLM/propose/build | ◐ CP-2 pending | T3.5 | 168 tests; proposer_v2; smoke run done (details private); **blocked: Gemini free tier = 20 req/day (D-029)** |
+| 3 LLM/propose/build | ◐ CP-2 pending | T3.5b | 181 tests; all stages on Groq (D-029 accepted); retry-after (D-030); gpt-oss re-smoke done (details private); waiting for "Gold labels done" |
 | 4 Arcs/judge/rank/run A | ☐ | | |
 | 5 Eval / run B | ☐ | | |
 | 6 App/deploy | ☐ | | |
@@ -336,3 +336,36 @@ A running log of every task Claude Code executes, in order. A new session must b
 **Summary for Harshit:** gold tooling ready; proposer_v2 written; smoke details in private/smoke_T3.5.md (open after you say "Gold labels done").
 **Please review:** private/smoke_T3.5.md (hook in the first 3 s? cliff unresolved?), promo_finder/prompts/proposer.md (v2), D-029 (model plan), D-027 update.
 **Questions / proposed decisions awaiting approval:** D-021 to D-029; D-029 is blocking.
+
+### T3.5b: Groq switch: retry-after, max_tokens sizing, CAMERA truncation, gpt-oss re-smoke, run A estimate  ·  2026-11-07  ·  status: done
+**Goal:** Harshit's D-029 follow-ups before CP-2: rate-limit handling, TPM sizing, smaller proposer input, re-smoke on gpt-oss, run A estimate, run B plan.
+**What I did:**
+- **Retry-after (TDD):** a 429 now waits for the provider's hint (Retry-After, x-ratelimit-reset-*, "try again in", retryDelay), else uses the backoff. A hint over `max_wait_s` (a daily quota) fails at once. Groq's generation-failure 400s (`json_validate_failed`) are retried. 9 tests (RED, then GREEN).
+- **TPM accounting, measured live:** Groq doesn't reserve max_tokens (requests with prompt + max_tokens up to ~9.4k were accepted on an idle window); actual tokens count. Proposer/arc max_tokens 4,000, judge 3,000, concurrency 1 (D-030).
+- **CAMERA ≤ 70 chars for the proposer (config flag, default on; TDD, 3 tests):** −4% tokens over the pack. The `[ID start–end]` stamps are the bigger cost (D-031).
+- **Config:** proposer/arc gpt-oss-120b, judge qwen3.8-27b, `reasoning_effort: null` everywhere (D-027 resolved).
+- **Re-smoke on episodes 6, 24, 40** (gpt-oss, proposer_v2): first attempt crashed (Groq 400, reasoning used up max_tokens 3,000; run folder `outputs/smoke_T3.5_gptoss_20261107_195447/` left empty), diagnosed with direct calls, fixed, rerun. Details only in private/smoke_T3.5.md.
+- **Run B:** Groq has no Llama chat model today, so I proposed Gemini 3.5 Flash-Lite as run B's proposer (D-032, needs Harshit's OK).
+**Files changed:** promo_finder/{llm,compact,propose}.py, scripts/make_gold_worksheet.py, tests/{test_llm,test_compact,test_propose}.py, config.yaml, decisions.md, ai_log.md, report.md. Private: private/smoke_T3.5.md.
+**Commands & results:**
+    $ pytest -q tests/test_llm.py → (RED) 7 failed; GREEN after the fix; json-failure retry: (RED) 1 failed → GREEN
+    $ pytest -q tests/test_compact.py tests/test_propose.py → (RED) 3 failed → GREEN
+    $ pytest -q → 181 passed in 27.07s
+    Groq headers (live): 1000 requests/day, 8000 tokens/min per model; gpt-oss: tiny prompt + max_tokens 9,000 → 200; ~4,074 + 4,500 → 200; 5,031 + 4,400 (idle) → 200, used 5,031 + 2,633
+    diagnosis, ep 40: schema/max 3,000 → OK (3,858 + 1,619); json_object/max 3,000 → OK (3,539 + 2,705); schema/max 4,400 → OK (3,858 + 2,275) [same input, different lengths: not deterministic]
+    diagnosis, ep 6: schema/max 3,000 → OK but 2,994 completion; json_object → 400 "Failed to generate JSON"; schema/max 4,400 → 429 (window still full)
+    tokens (LiteLLM counter): pack 220,040 → 210,675 with CAMERA ≤ 70; eps 6/24/40: 5,179→4,981, 4,327→4,159, 3,725→3,474
+    re-smoke run smoke_T3.5_gptoss_20261107_200730: 3 calls, (prompt, completion) = (5,378, 2,994), (4,558, 2,237), (3,858, 1,708); wall 123.5 s incl. Groq-hinted waits of 56.5 s and 46.0 s
+      6 proposals (2 per episode) → 4 built (all checks pass), 2 rejected too_short, 0 dropped, 0 repairs
+    Groq models (live list): no Llama chat model; gemini-3.5-flash-lite 1-token call → OK
+**Run A estimate (from 3 episodes, a small sample; prompt sizes are from the whole pack):**
+    proposer: prompt ≈ 230,800 (pack 210,675 × Groq/counter 1.095) + completion ≈ 115,700 (2,313 avg × 50) ≈ 346k tokens → ≈ 43 min at 8k TPM, ≈ 48 min with 10% repairs; ≈ 50–55 requests
+    yield: ≈ 100 proposals → ≈ 67 built clips (67% build rate)
+    arc: prompt ≈ 6,600 (system ~1,240 assumed + loglines 2,510 + 67 candidates × 42) + completion ≈ 2,300 → ≈ 8,900 tokens: **over 8k TPM for one call** → T4.1 must shrink the candidate lines (e.g. ID + beat + hook summary ≈ 20 tokens → ≈ 5.1k prompt) or split into 2 calls
+    judge (qwen, own TPM): ≈ 72 candidates incl. ~5 arcs; batch 3 → 24 calls × ≈ 5.4k = ≈ 129k tokens → ≈ 16 min (rubric size and output ~1k assumed until judge.md exists)
+    run A total ≈ 48 + ~3 + 16 ≈ 67 min sequential; requests ≈ 55 gpt-oss + 24 qwen (limit 1000/day each)
+    run B (D-032, 10 gold episodes): ≈ 10–12 flash-lite requests in parallel with run A's proposer, then ≈ 5 judge calls (≈ 4 min) queued behind run A's judge
+**Decisions:** D-029 Accepted + applied; D-027 resolved (null); D-030, D-031, D-032 (Proposed; D-032 needs Harshit's OK)
+**AI mistakes caught:** ai_log #7 (reasoning used up max_tokens; Groq's 400 treated as fatal; max_tokens sized without measuring)
+**Open issues / risks:** (1) Arc call over the TPM budget (T4.1). (2) Groq isn't deterministic at temp 0 → the cache matters for reproducibility; the self-stability metric will show the noise. (3) 2 of 6 proposals were too short again (hook→cliff spans) → candidate topic for the CP-2 prompt review. (4) For the doc: paid tier / Kuku API removes the caps (D-029).
+**Next:** CP-2, after "Gold labels done"

@@ -128,3 +128,28 @@ def test_mock_is_deterministic(episodes, cfg, tmp_path):
     a, _ = propose_episode(episodes[3], None, cfg, [], raw_dir=tmp_path)
     b, _ = propose_episode(episodes[3], None, cfg, [], raw_dir=tmp_path)
     assert a == b
+
+
+def test_proposer_view_uses_configured_camera_limit(episodes):
+    full = build_messages(episodes[3], None)[1]["content"]
+    short = build_messages(episodes[3], None, camera_max_chars=20)[1]["content"]
+    assert len(short) < len(full)
+    cams = [l.split(" CAM: ", 1)[1] for l in short.splitlines() if " CAM: " in l]
+    assert cams and all(len(c) <= 20 for c in cams)
+
+
+def test_propose_episode_reads_camera_limit_from_config(episodes, cfg):
+    sent = []
+
+    def fake(**kwargs):
+        sent.append(kwargs["messages"])
+        raise RuntimeError("stop after capturing the prompt")
+
+    cfg["mock"] = False
+    cfg["no_cache"] = True
+    cfg["models"]["proposer"]["api_key_env"] = None
+    cfg["proposer_input"] = {"camera_max_chars": 20}
+    with pytest.raises(RuntimeError):
+        propose_episode(episodes[3], None, cfg, [], completion_fn=fake)
+    cams = [l.split(" CAM: ", 1)[1] for l in sent[0][1]["content"].splitlines() if " CAM: " in l]
+    assert cams and all(len(c) <= 20 for c in cams)

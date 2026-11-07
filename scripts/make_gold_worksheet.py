@@ -15,7 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from promo_finder.aliases import load_aliases  # noqa: E402
-from promo_finder.compact import format_tc  # noqa: E402
+from promo_finder.compact import format_tc, shorten  # noqa: E402
 from promo_finder.parse import Block, Episode, load_pack  # noqa: E402
 
 CAMERA_MAX_CHARS = 70
@@ -47,9 +47,7 @@ def block_line(block: Block) -> str:
     stamp = f"{_short_id(block)} {format_tc(block.start)}"
     text = " ".join(block.text.split())
     if block.type == "CAMERA":
-        if len(text) > CAMERA_MAX_CHARS:
-            text = text[:CAMERA_MAX_CHARS - 1].rstrip() + "…"
-        return f"{stamp} cam: {text}"
+        return f"{stamp} cam: {shorten(text, CAMERA_MAX_CHARS)}"
     if block.type == "ACTION":
         return f"{stamp} ACT: {text}"
     if block.type == "SOUND_FX":

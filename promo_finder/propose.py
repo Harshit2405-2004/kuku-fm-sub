@@ -36,10 +36,12 @@ class EpisodeProposals(BaseModel):
     candidates: list[ProposalCandidate] = Field(default_factory=list, max_length=4)
 
 
-def build_messages(ep: Episode, cast: dict[str, str] | None, prompt_name: str = "proposer") -> list[dict]:
+def build_messages(ep: Episode, cast: dict[str, str] | None, prompt_name: str = "proposer",
+                   camera_max_chars: int | None = None) -> list[dict]:
     _version, sections = load_prompt(prompt_name)
+    view = compact_episode(ep, cast, camera_max_chars)
     # str.replace, not str.format: script text can contain braces.
-    user = sections["user"].replace("{episode}", str(ep.ep)).replace("{compact}", compact_episode(ep, cast))
+    user = sections["user"].replace("{episode}", str(ep.ep)).replace("{compact}", view)
     return [{"role": "system", "content": sections["system"]}, {"role": "user", "content": user}]
 
 
@@ -76,7 +78,8 @@ def propose_episode(ep: Episode, cast: dict[str, str] | None, cfg: dict, usage: 
                     prompt_name: str = "proposer") -> tuple[EpisodeProposals, list[dict]]:
     """Returns (valid proposals, dropped candidates with reasons)."""
     version, _ = load_prompt(prompt_name)
-    messages = build_messages(ep, cast, prompt_name)
+    camera_max_chars = (cfg.get("proposer_input") or {}).get("camera_max_chars")
+    messages = build_messages(ep, cast, prompt_name, camera_max_chars)
     proposals, raw = call_llm("proposer", messages, EpisodeProposals, cfg, version, usage, completion_fn=completion_fn)
     _save_raw(raw_dir, f"E{ep.ep:02d}.json", raw)
 

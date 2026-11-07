@@ -24,6 +24,9 @@ log = logging.getLogger(__name__)
 
 # HTTP statuses worth retrying: rate limit, timeout, and server-side errors.
 RETRYABLE_STATUS = {408, 429, 500, 502, 503, 504}
+# 400s that are really generation failures (Groq: the model ran out of tokens or broke the schema
+# while decoding), so a second attempt can succeed (D-030).
+RETRYABLE_400_MARKERS = ("json_validate_failed", "Failed to generate JSON", "Failed to validate JSON")
 
 
 class LLMOutputError(Exception):
@@ -43,6 +46,60 @@ def extract_json(text: str | None) -> str:
 
 def _status(error: Exception) -> int | None:
     return getattr(error, "status_code", None)
+
+
+# Margin added to a provider's wait hint, so we don't retry a few ms before the window resets.
+RETRY_MARGIN_S = 0.5
+_DURATION_PART = re.compile(r"(\d+(?:\.\d+)?)(ms|h|m|s)")
+
+
+def parse_duration(text: str) -> float | None:
+    """'7' / '7.66s' / '712ms' / '1m2.5s' / '64822s' -> seconds; None if unreadable."""
+    text = str(text).strip().strip('"')
+    if re.fullmatch(r"\d+(?:\.\d+)?", text):
+        return float(text)
+    parts = _DURATION_PART.findall(text)
+    if not parts or "".join(n + u for n, u in parts) != text.replace(" ", ""):
+        return None
+    scale = {"ms": 0.001, "s": 1, "m": 60, "h": 3600}
+    return sum(float(n) * scale[u] for n, u in parts)
+
+
+def _error_headers(error: Exception) -> dict[str, str]:
+    """Response headers from a LiteLLM exception (or its httpx response), lower-cased."""
+    for raw in (getattr(error, "litellm_response_headers", None),
+                getattr(getattr(error, "response", None), "headers", None),
+                getattr(error, "headers", None)):
+        if raw:
+            try:
+                return {str(k).lower(): str(v) for k, v in dict(raw).items()}
+            except (TypeError, ValueError):
+                continue
+    return {}
+
+
+def retry_after_s(error: Exception) -> float | None:
+    """The provider's own 'wait this long' hint on a 429, or None if it gave none (D-030).
+
+    Sources, longest wins: the Retry-After header; Groq's x-ratelimit-reset-tokens (the per-minute
+    token window), and x-ratelimit-reset-requests only when no requests are left; and the error text
+    ("try again in 12.3s", Gemini's "retryDelay": "64822s").
+    """
+    headers = _error_headers(error)
+    hints = []
+    if "retry-after" in headers:
+        hints.append(parse_duration(headers["retry-after"]))
+    if "x-ratelimit-reset-tokens" in headers:
+        hints.append(parse_duration(headers["x-ratelimit-reset-tokens"]))
+    if headers.get("x-ratelimit-remaining-requests") == "0" and "x-ratelimit-reset-requests" in headers:
+        hints.append(parse_duration(headers["x-ratelimit-reset-requests"]))
+    text = str(error)
+    for pattern in (r"try again in\s+([0-9.]+(?:ms|s|m|h)?(?:[0-9.]+(?:ms|s))?)", r'retryDelay"?\s*:\s*"([^"]+)"'):
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            hints.append(parse_duration(match.group(1)))
+    hints = [h for h in hints if h is not None]
+    return max(hints) + RETRY_MARGIN_S if hints else None
 
 
 def _completion_kwargs(stage_cfg: dict, messages: list[dict], schema: type[BaseModel]) -> dict:
@@ -71,9 +128,10 @@ def _completion_kwargs(stage_cfg: dict, messages: list[dict], schema: type[BaseM
 
 
 def _call_with_retries(completion_fn: Callable, kwargs: dict, retries: dict, sleep: Callable):
-    """Exponential backoff on 429/5xx. If an endpoint rejects response_format or reasoning_effort, drop it."""
+    """Retry 429/5xx (provider wait hint, else exponential backoff). Drop optional params an endpoint rejects."""
     max_attempts = retries.get("max_attempts", 5)
     base = retries.get("backoff_base_s", 2)
+    max_wait = retries.get("max_wait_s", 120)
     for attempt in range(1, max_attempts + 1):
         try:
             return completion_fn(**kwargs)
@@ -86,10 +144,17 @@ def _call_with_retries(completion_fn: Callable, kwargs: dict, retries: dict, sle
                 log.warning("%s rejected %s; retrying without it", kwargs["model"], rejected)
                 kwargs = {k: v for k, v in kwargs.items() if k != rejected}
                 continue
-            if status not in RETRYABLE_STATUS or attempt == max_attempts:
+            generation_failure = status == 400 and any(m in str(error) for m in RETRYABLE_400_MARKERS)
+            if (status not in RETRYABLE_STATUS and not generation_failure) or attempt == max_attempts:
                 raise
-            wait = base * 2 ** (attempt - 1)
-            log.warning("%s: HTTP %s, retry %d/%d in %ss", kwargs["model"], status, attempt, max_attempts - 1, wait)
+            # Wait as long as the provider says (a 60 s token window outlasts a 2-4-8-16 s backoff);
+            # if it says hours (a daily quota), waiting can't help: fail now with the provider's error.
+            hint = retry_after_s(error) if status == 429 else None
+            if hint is not None and hint > max_wait:
+                log.error("%s: provider asks to wait %.0f s (> max_wait_s %s); giving up", kwargs["model"], hint, max_wait)
+                raise
+            wait = hint if hint is not None else base * 2 ** (attempt - 1)
+            log.warning("%s: HTTP %s, retry %d/%d in %.1fs", kwargs["model"], status, attempt, max_attempts - 1, wait)
             sleep(wait)
     raise RuntimeError("unreachable")
 

@@ -75,3 +75,26 @@ def test_cast_line_only_when_cast_given(episodes):
 def test_estimate_tokens():
     assert estimate_tokens("abcd" * 10) == 10
     assert estimate_tokens("") == 0
+
+
+# --- shorter CAMERA lines for the proposer (D-031)
+
+def test_camera_text_truncated_only_when_asked(episodes):
+    full = compact_episode(episodes[3]).splitlines()
+    short = compact_episode(episodes[3], camera_max_chars=20).splitlines()
+    assert len(full) == len(short)
+    for f, s in zip(full, short):
+        if " CAM: " in f:
+            text = s.split(" CAM: ", 1)[1]
+            assert len(text) <= 20
+            if len(f.split(" CAM: ", 1)[1]) > 20:
+                assert text.endswith("…")
+        else:
+            assert f == s   # dialogue, action and SFX lines are never shortened
+
+
+def test_shorten_keeps_short_text_and_marks_cuts():
+    from promo_finder.compact import shorten
+    assert shorten("Close-up.", 70) == "Close-up."
+    assert shorten("a" * 80, 70) == "a" * 69 + "…"
+    assert shorten("a" * 80, None) == "a" * 80
