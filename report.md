@@ -36,8 +36,8 @@ A running log of every task Claude Code executes, in order. A new session must b
 |---|---|---|---|
 | 0 Setup | ☑ | T0-fix | venv 3.13, git init, kit + doc fixes committed (fc4c4b7). Deadline set at CP-1 leftovers. |
 | 1 Parser | ☑ | CP-1 leftovers | 50/50 eps; 0 unassigned lines; aliases final (0 VERIFY, per-episode override D-026); 51 canonical speakers |
-| 2 Gold | ◐ tooling ready | T2.2a | Worksheet in private/gold_worksheet.md (10 eps, 780 blocks); holdout written; Harshit labelling |
-| 3 LLM/propose/build | ◐ CP-2 pending | T3.5b | 181 tests; all stages on Groq (D-029 accepted); retry-after (D-030); gpt-oss re-smoke done (details private); waiting for "Gold labels done" |
+| 2 Gold | ◐ labels approved | T2.2 | Harshit: "Gold labels done" (provenance D-033); **gold/gold_labels.csv not generated yet**: Harshit to run scripts/gold_from_worksheet.py |
+| 3 LLM/propose/build | ◐ at CP-2 | CP-2 | 181 tests; reviewer PASS WITH FIXES (0 blocking, 11 should-fix); smoke 4 valid clips / 6 proposals; waiting for Harshit's go |
 | 4 Arcs/judge/rank/run A | ☐ | | |
 | 5 Eval / run B | ☐ | | |
 | 6 App/deploy | ☐ | | |
@@ -369,3 +369,30 @@ A running log of every task Claude Code executes, in order. A new session must b
 **AI mistakes caught:** ai_log #7 (reasoning used up max_tokens; Groq's 400 treated as fatal; max_tokens sized without measuring)
 **Open issues / risks:** (1) Arc call over the TPM budget (T4.1). (2) Groq isn't deterministic at temp 0 → the cache matters for reproducibility; the self-stability metric will show the noise. (3) 2 of 6 proposals were too short again (hook→cliff spans) → candidate topic for the CP-2 prompt review. (4) For the doc: paid tier / Kuku API removes the caps (D-029).
 **Next:** CP-2, after "Gold labels done"
+
+### CP-2 reached  ·  2026-11-07
+**Summary for Harshit:**
+- Phase 3 is built: LLM layer on Groq (proposer/arc gpt-oss-120b, judge qwen3.8-27b), cut builder, proposer_v2, gold tooling. 181 tests pass.
+- Smoke run `smoke_T3.5_gptoss_20261107_200730` (episodes 6, 24, 40; non-gold): 6 proposals → 4 valid clips (21.9 s, 37.0 s, 40.5 s, 52.3 s), all checks pass; 2 rejected too_short (19.2 s, 7.3 s). 3 calls, 13,794 prompt + 6,939 completion tokens, 123.5 s wall.
+- Claude's read (details private): 1 strong, 2 solid, 1 weak (soft hook, mislabelled beat). One clip starts exactly on its hook (0.0 s lead-in), and one hook sits at the 3.0 s limit.
+- Run A estimate: about 67 min, about 80 requests (T3.5b entry).
+- Gold labels: approved by Harshit, with the provenance recorded verbatim in D-033. `gold/gold_labels.csv` doesn't exist yet: Harshit runs `scripts/gold_from_worksheet.py`. Claude hasn't opened the worksheet or the CSV.
+**Please review:**
+- private/smoke_T3.5.md (last section): is each hook really in the first 3 s, and is each cliff unresolved?
+- promo_finder/prompts/proposer.md (v2): candidate v3 changes are (1) a quiet episode → fewer picks, not soft hooks; (2) "hook→cliff must span ≥ 20 s of screen time"
+- D-033: public exposure of the gold/held-out episode numbers and per-episode label notes
+- the reviewer's should-fix list below
+**Questions / proposed decisions awaiting approval:** D-021 to D-028 (one-line list given in chat), D-030, D-031, D-032 (run B on gemini-3.5-flash-lite, since Groq has no Llama chat model). Accepted: D-029, D-033.
+**Reviewer verdict:** independent-reviewer (Phase 3 diff 037a437..HEAD): **PASS WITH FIXES**. 0 blocking; hard rules 1, 2, 3 and 8 hold; leak check (incl. --pre-push) passes; 181 tests pass. Nothing fixed at the checkpoint (the procedure fixes blocking items only). Should-fix items, for Harshit to decide:
+  1. llm.py: dropping a rejected optional parameter on the last attempt raises `RuntimeError("unreachable")` instead of the real error (reproduced by the reviewer).
+  2. llm.py: the rejected-parameter check runs before the generation-failure check, so a `json_validate_failed` body that mentions `response_format` drops schema enforcement. The drop isn't remembered across calls, and there's no fallback to json_object.
+  3. propose.py: a failed repair call loses the episode's valid candidates (it should keep them and log).
+  4. propose.py: a wrong `episode` field alone triggers a wasted repair call.
+  5. cache.py: the key leaves out `api_base` and `temperature`, so two endpoints serving the same model string share cache entries. This matters for a Kuku endpoint swap.
+  6. gold_from_worksheet.py: a malformed arc `hook=`/`cliff=` silently falls back to the default.
+  7. gold_from_worksheet.py: arc segment order isn't checked (should warn).
+  8. gold_from_worksheet.py: case-sensitive `note=` split, so `Note= ... hook=B5` overrides the hook.
+  9. D-033: gold and held-out episode numbers in a public file (D-028 keeps holdout.txt ignored).
+  10. v1→v2 prompt bump without a before/after (v1 never ran on real episodes).
+  11. build tests: add boundary tests at exactly 60.0 s, 20.0 s and a 3.0 s hook (the reviewer's probe says behaviour is already correct).
+  Nits: the "try again in" parser handles 2 units only; Retry-After is ignored on 503; a generation-failure retry reuses the same max_tokens; the cache key uses the schema name, not its fields; the TECH_SPEC §5 example is stale (low/Gemini); the NONE regex matches "none of these…"; `_shots` re-sorts on every call.

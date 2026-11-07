@@ -290,3 +290,12 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Alternatives: proposer qwen3.8-27b (same family as the judge, which biases the comparison); gpt-oss-20b (same family, so it's a size swap, not a family swap); swap the judge too (confounds the comparison).
 - Consequences: run B compares OpenAI-family vs Google-family proposers on the gold set, with the judge held fixed. If flash-lite hits a quota mid-run, report the episodes completed (never fabricate).
 - Reversible?: Yes (CLI `--proposer-model`).
+
+## D-033: Gold-set provenance (exact wording to reuse)
+- Date: 2026-11-07 · Owner: Harshit · Status: **Accepted** (Harshit, 2026-11-07)
+- Context: EVAL_PLAN §1 assumed hand labels. Harshit reports how the gold set was actually made, and asked that this exact wording be used wherever the gold set is described (eval report, doc draft).
+- **Wording to use verbatim** (Harshit's words): "Gold episodes: 1, 3, 8, 12, 17, 18, 27, 31, 42, 45. Held-out: 3, 27, 45. Provenance: picks were drafted by Claude in a separate claude.ai session (not a pipeline model), from a full read of these 10 episodes, then reviewed and approved by me; I chose to keep E31 at quality 3 with a brand-safety note, and E08/E17 as none."
+  (In third-person documents, "me" = Harshit.)
+- Decision: The gold set is LLM-drafted and human-approved. Report every gold-based metric (recall, recall@20, weighted recall, quiet-episode false positives) together with this provenance statement, never as "human labels" alone.
+- Consequences (Claude's note, for honest reporting, not a reversal): gold recall measures agreement with a Claude-drafted, Harshit-approved shortlist, not with an independent human editor. Claude is not in the pipeline (proposer gpt-oss, judge qwen, run B Gemini; D-029, D-032), so there's no same-model leakage. Still, two LLMs can share blind spots, so recall may be inflated on moments any LLM finds obvious and say little about moments only a human would pick. Blind precision@10 (EVAL check 3, Harshit rating outputs) is the more independent human signal, and should be named as such in the doc. Claude Code (this session) has not opened the filled worksheet or the CSV.
+- Reversible?: The wording is fixed by Harshit; the labels can be revised by hand.
