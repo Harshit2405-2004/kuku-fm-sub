@@ -34,8 +34,8 @@ A running log of every task Claude Code executes, in order. A new session must b
 
 | Phase | Status | Last task | Notes |
 |---|---|---|---|
-| 0 Setup | ☐ | | Harshit |
-| 1 Parser | ☐ | | |
+| 0 Setup | ☑ | T0-fix | venv 3.13, git init, kit + doc fixes committed (fc4c4b7). Deadline still TBD. |
+| 1 Parser | ◐ CP-1 waiting | T1.4 | 68 tests; real pack 50/50 eps parsed; alias map awaits Harshit |
 | 2 Gold | ☐ | | Harshit |
 | 3 LLM/propose/build | ☐ | | |
 | 4 Arcs/judge/rank/run A | ☐ | | |
@@ -132,3 +132,20 @@ A running log of every task Claude Code executes, in order. A new session must b
 **AI mistakes caught:** none
 **Open issues / risks:** Proposer input is about 2.4k tokens per episode plus the prompt, well inside free-tier context limits. The whole show (~120k) would fit one long-context call, but D-003 keeps per-episode calls.
 **Next:** CP-1
+
+### CP-1 reached  ·  2026-11-07
+**Summary for Harshit:** Phase 1 is built and committed (T1.1–T1.4). There's a fictional 3-episode synthetic show, a tolerant parser, an alias loader, a stats CLI and the compact LLM view. `pytest -q` → 68 passed. Real pack: 50/50 episodes, 100 scenes, 3727 blocks (CAMERA 1754, ACTION 372, DIALOGUE 1487, SOUND_FX 114), durations 70.5–200.8 s (102.7 min total), 1 harmless warning. 64 raw speaker labels → 52 canonical speakers with the draft alias map. About 120.5k estimated tokens for the whole show (median 2.4k per episode).
+**Please review:**
+1. `config/aliases.yaml`: every line marked VERIFY, and the deliberately unmapped labels at the bottom. One descriptive label contradicts the private notes' guess; the reasoning is in `private/parse_stats_T1.3.md`.
+2. `private/parse_stats_T1.3.md`: speaker list and the one warning.
+3. One compact view: `python -m promo_finder.compact --input input --ep 1`.
+4. `private/leak_keywords.txt`: add or remove keywords.
+**Proposed decisions awaiting approval:** D-013 (Python 3.13 venv), D-018 (parser tolerance rules), D-019 (compact-view details).
+**Reviewer verdict:** PASS WITH FIXES, 0 blocking. It reproduced every real-pack count and found 0 silently dropped lines on the real pack, and git history plus commit messages are clean. Should-fix items left for Harshit:
+- (a) Lines after a block's text, or a `**LABEL**:` header variant, are dropped with no warning.
+- (b) A malformed time string crashes the whole pack (contradicts D-018's "never crashes").
+- (c) A file with no SCRIPT START marker parses to 0 blocks with only a "no dialogue" warning.
+- (d) An unknown header key gets appended to the logline.
+- (e) The duration test passes for the wrong reason.
+- (f) The leak check reads the working tree, not staged blobs, and doesn't scan history or commit messages.
+- Nits: banker's rounding in format_tc, pytest only works from the repo root, multi-line quoted dialogue, more flag spellings, the SFX label alias isn't logged.
