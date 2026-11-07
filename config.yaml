@@ -70,6 +70,7 @@ build:
   extend_max_s: 8.0          # max forward extension for too-short clips
   dedupe_iou: 0.5
   arc_min_segment_s: 4.0
+  arc_seg1_min_s: 8.0        # arc opening part: at least this long, so the hook has room to land
 
 rank:
   weights: {hook: 0.35, cliff: 0.30, standalone: 0.20, trope_pull: 0.10, pacing: 0.05}
@@ -80,3 +81,6 @@ rank:
 
 judge:
   batch_size: 3            # clips per judge call; ~3 full excerpts keep one call under Groq's 8k tokens/minute
+
+arcs:
+  enabled: true            # one extra LLM call pairing single-episode clips across episodes (D-039)

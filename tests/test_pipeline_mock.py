@@ -48,9 +48,9 @@ def test_manifest_schema(run_dir):
                 "usage", "cost_usd", "timings_s", "errors", "config"):
         assert key in m, key
     assert m["mock"] is True and m["episodes_parsed"] == 3 and m["errors"] == []
-    assert m["prompt_versions"] == {"proposer": "proposer_v3", "judge": "judge_v1"}
+    assert m["prompt_versions"] == {"proposer": "proposer_v3", "arc": "arc_v1", "judge": "judge_v1"}
     assert m["counts"]["ranked"] >= 1 and m["counts"]["unscored"] == 0
-    assert set(m["usage"]) == {"proposer", "judge"}
+    assert set(m["usage"]) == {"proposer", "arc", "judge"}
     assert '"api_key":' not in json.dumps(m["config"])   # env var NAMES only, never key values
 
 

@@ -76,10 +76,30 @@ def mock_judge(messages: list[dict]) -> dict:
     return {"scores": scores}
 
 
+ARC_LINE = re.compile(r"^(?P<id>\S+) \| episode (?P<ep>\d+) \|")
+
+
+def mock_arcs(messages: list[dict]) -> dict:
+    """Pair the first candidate of the earliest episode with the first of the latest episode."""
+    text = messages[-1]["content"] if messages else ""
+    firsts: dict[int, str] = {}
+    for line in text.splitlines():
+        m = ARC_LINE.match(line.strip())
+        if m:
+            firsts.setdefault(int(m["ep"]), m["id"])
+    if len(firsts) < 2:
+        return {"arcs": []}
+    eps = sorted(firsts)
+    return {"arcs": [{"reasoning": "mock: earliest opener, latest closer", "opener": firsts[eps[0]],
+                      "closer": firsts[eps[-1]], "hook_summary": "mock hook", "cliff_summary": "mock cliff"}]}
+
+
 def respond(stage: str, messages: list[dict]) -> str:
     """Return the raw JSON text a model would have returned for this stage."""
     if stage == "proposer":
         return json.dumps(mock_proposer(messages))
     if stage == "judge":
         return json.dumps(mock_judge(messages))
+    if stage == "arc":
+        return json.dumps(mock_arcs(messages))
     raise NotImplementedError(f"mock reply for stage '{stage}' not built yet")

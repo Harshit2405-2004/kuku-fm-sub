@@ -16,6 +16,7 @@ from typing import Callable
 
 from promo_finder import report
 from promo_finder.aliases import load_aliases
+from promo_finder.arcs import propose_arcs
 from promo_finder.build import Candidate, build_candidate, dedupe
 from promo_finder.judge import judge_candidates
 from promo_finder.llm import load_prompt, summarize_usage
@@ -119,7 +120,24 @@ def _run(input_path, cfg, run_id, run_dir, aliases_path, episodes_filter, comple
     report.write_json(run_dir / "rejected.json", {"rejected": rejected, "dropped_by_proposer": dropped})
     timings["propose_build"] = round(time.time() - t, 2)
 
-    # (Arcs, TECH_SPEC §4.4, are built last if time allows; until then a run is single-episode only.)
+    # 3b. Cross-episode arcs (TECH_SPEC §4.4). Appended after the singles, so the singles' judge
+    # batches stay identical to a run without arcs and come from the cache.
+    arcs_status = "disabled"
+    if (cfg.get("arcs") or {}).get("enabled"):
+        t = time.time()
+        try:
+            arcs, arc_rejected = propose_arcs(candidates, episodes, cfg, usage, raw_path=run_dir / "arcs_raw.json",
+                                              completion_fn=completion_fn)
+            candidates += arcs
+            rejected += [{"reason": f"arc_{r['reason']}", **r} for r in arc_rejected]
+            arcs_status = f"{len(arcs)} built, {len(arc_rejected)} rejected"
+        except Exception as error:
+            log.error("arcs failed: %s", error)
+            errors.append({"stage": "arc", "error": f"{type(error).__name__}: {error}"[:300]})
+            arcs_status = "failed"
+        report.write_json(run_dir / "candidates.json", [c.model_dump() for c in candidates])
+        report.write_json(run_dir / "rejected.json", {"rejected": rejected, "dropped_by_proposer": dropped})
+        timings["arcs"] = round(time.time() - t, 2)
 
     # 4. Judge
     t = time.time()
@@ -145,8 +163,8 @@ def _run(input_path, cfg, run_id, run_dir, aliases_path, episodes_filter, comple
         "git_commit": _git_commit(),
         "mock": bool(cfg.get("mock")),
         "models": {stage: ("mock" if cfg.get("mock") else c["model"]) for stage, c in cfg["models"].items()},
-        "prompt_versions": {name: load_prompt(name)[0] for name in ("proposer", "judge")},
-        "arcs": "not run",
+        "prompt_versions": {name: load_prompt(name)[0] for name in ("proposer", "arc", "judge")},
+        "arcs": arcs_status,
         "episodes_parsed": len(episodes),
         "episodes_run": todo,
         "parse_stats": pack_stats(all_episodes),

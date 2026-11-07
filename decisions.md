@@ -346,3 +346,11 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Context: Run A is ~1 hour of free-tier calls; one 429 or bad reply must not lose the run.
 - Decision: a failed episode (proposer) or batch (judge) is logged in `manifest.errors` and the run continues; candidates.json/rejected.json are written before judging; the cache makes a rerun of finished work free. `--episodes 1,3,8` limits a run (for run B on the gold episodes). Two runs with the same name in the same minute get a `-2` suffix. Pipeline logic lives in `promo_finder/pipeline.py` so app.py reuses it. Arcs (T4.1) are built last, per Harshit's order; until then the manifest says `"arcs": "not run"`.
 - Reversible?: Yes.
+
+## D-039: Arcs pair built candidates by ID (2 segments), instead of free block-ID segments
+- Date: 2026-11-07 · Owner: Claude (proposed) · Status: Proposed
+- Context: TECH_SPEC §4.4 lets the arc model return 2–3 segments as {episode, start_block, end_block}. On Groq's free tier the arc prompt with full candidate detail was estimated at ~6.6k prompt + ~2.3k completion tokens, over 8k tokens/minute for one call. Arcs also had a 30-minute build cap.
+- Decision: the model only pairs two already-built single-episode candidates (opener → closer) by candidate ID; code cuts both parts on shot boundaries (opener's start → first clean shot end ≥ 8 s after the hook line; closer's tail sized to a 55 s total, ending on its own cliff). The input is one short line per candidate plus loglines shortened to 160 characters, only for episodes with candidates.
+- Alternatives: free block-ID segments (spec; bigger prompt, more to validate, more ways to cut a line in half); 3-segment arcs (left for later).
+- Consequences: arcs can only reuse moments the proposer already found; each arc has exactly 2 segments. The "early humiliation → late reveal" pattern is still possible if both are candidates.
+- Reversible?: Yes (arcs.enabled: false turns it off).

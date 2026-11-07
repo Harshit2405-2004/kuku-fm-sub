@@ -483,3 +483,19 @@ A running log of every task Claude Code executes, in order. A new session must b
 **AI mistakes caught:** none
 **Open issues / risks:** the first draft of a manifest test was too strict (it rejected the `api_key_env` setting name); the assertion now checks only for key values.
 **Next:** run A finishes → arcs (T4.1, 30-min cap) → CP-3
+
+### T4.1: Arc promos (`arcs.py`, `prompts/arc.md` arc_v1)  ·  2026-11-07 21:03  ·  status: done (code + mock); live call after run A
+**Goal:** Cross-episode promos, built last under a 30-minute cap (Harshit, CP-2). Started 21:01; code and tests done 21:03.
+**What I did:**
+- One arc call per run. The model sees short loglines for the episodes that have candidates and one line per built candidate (ID, episode, beat, how it opens, how it ends), and returns pairs of candidate IDs (opener, closer) from different episodes. No block IDs or times in its input or output (D-039).
+- Code: segment 1 = the opener from its start to the first clean shot end ≥ 8 s in and after the hook line (≤ 25 s); segment 2 = the closer from the earliest clean shot start that fits a 55 s total, through the closer's own end, keeping the whole cliff line (≥ 4 s). Checks 20–60 s and hook ≤ 3 s; the opener's mid-shot flag is carried, not hidden. Rejections: unknown_candidate, same_episode, no_clean_opening_cut, no_clean_closing_cut, duration.
+- Arcs are appended after the singles, so a rerun with arcs reuses every cached proposer and single-clip judge call; only the arc call and the arc judge batches are new. `arcs.enabled` in config; a failed arc call is a manifest error and the run carries on.
+- Mock arc reply; tests/test_arcs.py (5).
+**Files changed:** promo_finder/arcs.py, promo_finder/prompts/arc.md, promo_finder/pipeline.py, promo_finder/mock.py, config.yaml (arcs.enabled, build.arc_seg1_min_s), tests/test_arcs.py, tests/test_pipeline_mock.py
+**Commands & results:**
+    $ python run.py --input samples/synthetic_show --mock --run-name mockarc --aliases config/aliases.example.yaml → arcs: 1 picked, 1 built, 0 rejected · 4 ranked, 0 errors
+    $ pytest -q → (RED) 1 failed (test assumed a clean shot start; the synthetic opener itself starts mid-shot) → 240 passed in 10.22s
+**Decisions:** D-039 (Proposed)
+**AI mistakes caught:** none (the failing test was my assumption, fixed in the test)
+**Open issues / risks:** run A (started 20:58) runs WITHOUT arcs because its config was loaded before arcs existed. The live arc call has to wait for run A, since both use gpt-oss on the same 8k tokens/minute. Plan: after run A, rerun the same command with arcs on (cache makes the rest free) and report both.
+**Next:** run A finishes → arcs live → CP-3
