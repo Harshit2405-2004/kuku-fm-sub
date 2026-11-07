@@ -1,0 +1,22 @@
+# --- Confidential: Kuku input pack and anything derived from it (see decisions.md D-008) ---
+input/*
+!input/README.md
+outputs/
+private/
+config/aliases.yaml
+gold/*.csv
+!gold/gold_labels.template.csv
+gold/holdout.txt
+.cache/
+*.zip
+
+# --- Secrets ---
+.env
+.streamlit/secrets.toml
+
+# --- Python ---
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/

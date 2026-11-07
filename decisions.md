@@ -1,0 +1,159 @@
+# Decisions log
+
+Every non-obvious choice is recorded here: what we chose, what we rejected, and what it costs us. Kuku's brief grades "the assumptions you made where the brief was silent" and "what you gave to AI vs code vs human", and this file is the evidence.
+
+**Rules**
+- Append only. Never delete an entry. To reverse one, add a new entry that says `Supersedes D-0xx`.
+- Claude Code adds entries with `Status: Proposed`. Harshit changes them to `Accepted` or `Rejected` at checkpoints.
+- Keep each entry short.
+
+**Template**
+```
+## D-0xx: <title>
+- Date: YYYY-MM-DD · Owner: Harshit | Claude · Status: Proposed | Accepted | Rejected | Superseded
+- Context: <why a decision was needed>
+- Decision: <what we chose>
+- Alternatives: <what else, and why not>
+- Consequences: <what this costs us and what it buys us; how it shows up in the eval or interview>
+- Reversible?: yes/no (how)
+```
+
+---
+
+## D-001: Solve Problem 1 (Find the Promos)
+- Date: 2026-11-07 · Owner: Harshit · Status: Accepted
+- Context: The brief says pick one of three problems, and the choice itself is graded.
+- Decision: Problem 1.
+- Alternatives: P2 (AI lawyer): unrelated to Kuku's business, likely the most crowded, and hallucinated law is the main risk. P3 (own problem): highest variance; it needs evidence that it matters *more than P1*, which is hard to show in a few hours. A continuity checker was considered (the pack has name and place drift) and kept as a "noticed along the way" note.
+- Consequences: The work ties directly to Kuku's largest cost (marketing, ₹1,105 Cr, 77.7% of FY26 expenses). The input pack makes the output checkable. Many candidates may pick it, so we stand out on execution and evaluation, not on the choice.
+- Reversible?: No, after submission.
+
+## D-002: The LLM never writes timestamps. It returns block IDs, and code computes the times.
+- Date: 2026-11-07 · Owner: Harshit · Status: Accepted
+- Context: LLMs misread and invent numbers. A promo with wrong timestamps is useless to an editor.
+- Decision: Every block gets an ID (`E01-B037`). Models output IDs only, and code maps IDs to times, snaps and validates.
+- Alternatives: Let the model output times and then verify them (still error-prone, needs repair logic). Pure rules with no LLM (can't judge drama).
+- Consequences: Timestamp hallucination is impossible by construction. Validity is 100%. IDs that don't exist are caught and retried. This is our clearest "AI vs code" talking point.
+- Reversible?: n/a
+
+## D-003: One proposer call per episode, plus one cross-episode arc pass
+- Date: 2026-11-07 · Owner: Harshit · Status: Accepted
+- Context: The whole show is about 100–150k tokens. One giant call is possible on some models, but it's hard to control and is all-or-nothing.
+- Decision: Run the proposer per episode (parallel, cacheable, retryable). Run a separate arc pass over loglines plus per-episode summaries for multi-episode promos.
+- Alternatives: A single long-context call (cheaper in calls, but worse attention to detail, a single point of failure, and not possible on small free models).
+- Consequences: Robust to free-tier limits and partial failures. Cost scales linearly with episodes. Arc quality depends on how good the summaries are.
+- Reversible?: Yes (config).
+
+## D-004: Cuts snap to CAMERA shot boundaries; the hook must start within 3.0 s
+- Date: 2026-11-07 · Owner: Harshit · Status: Accepted
+- Context: The brief requires a hook in the first 3 seconds. Editors cut on shots.
+- Decision: TECH_SPEC §4.3 snapping rules. Overlong spans become jump-cuts; too-short ones are extended or rejected.
+- Alternatives: Cut exactly on dialogue times (mid-shot cuts look amateur).
+- Consequences: Clean, editor-ready cuts. It sometimes trades away a little context, which shows up as `needs_context` and is measured.
+- Reversible?: Yes (thresholds in config).
+
+## D-005: LiteLLM provider layer, with the model chosen per stage and an OpenAI-compatible api_base
+- Date: 2026-11-07 · Owner: Harshit · Status: Accepted
+- Context: The brief says "we may also connect stronger models through APIs we provide, so a solution where the model is easy to swap will shine."
+- Decision: All calls go through `llm.py` (LiteLLM). Models are set in `config.yaml` per stage, overridable with flags (`--model`, `--api-base`, `--api-key-env`).
+- Alternatives: Use the Gemini SDK directly (locks us to one vendor). LangChain (heavy, harder to explain).
+- Consequences: Swapping is one flag, and we rehearse it (T8.2). LiteLLM is a dependency we have to understand at a basic level.
+- Reversible?: Yes.
+
+## D-006: The judge uses a different model family from the proposer
+- Date: 2026-11-07 · Owner: Harshit · Status: Accepted
+- Context: LLM judges tend to favour outputs that look like their own (self-preference bias).
+- Decision: Default to a Gemini proposer and a Groq-hosted judge from a different family. Measure judge–human agreement (EVAL §2).
+- Alternatives: Same model for both (simpler, but biased); no judge, rank by proposer order (no calibrated scores).
+- Consequences: Less bias, plus two free quotas instead of one. Two providers to configure.
+- Reversible?: Yes (config).
+
+## D-007: Harshit hand-labels the gold set before seeing any model output
+- Date: 2026-11-07 · Owner: Harshit · Status: Accepted
+- Context: Without ground truth, "quality checking" is only opinion. Labelling after seeing the outputs anchors you to them.
+- Decision: 12–20 gold promos over about 10 episodes, labelled before the smoke test output is read, with 3 held-out episodes.
+- Alternatives: LLM-generated gold (circular). No gold (weak quality lens).
+- Consequences: Costs about an hour of Harshit's time, and it's the strongest evidence in the submission. It is a single-annotator set, which is a stated limitation.
+- Reversible?: n/a
+
+## D-008: The repo is public but contains nothing derived from the confidential pack
+- Date: 2026-11-07 · Owner: Harshit · Status: Accepted
+- Context: The prototype link must "open for anyone", and the brief says not to publish or share the pack.
+- Decision: Git-ignore `input/`, `outputs/`, `private/`, `config/aliases.yaml`, `gold/*.csv` and `.cache/`. Tests, demos and prompt examples use a fictional synthetic show. A leak-check script runs before every push. Raw outputs are shared only through the Drive link in the form.
+- Alternatives: Private repo (Kuku can't open it). Public repo including the pack (breaks confidentiality).
+- Consequences: A little extra work (synthetic show, leak check), and it shows good judgement.
+- Reversible?: No (once pushed, it's out), so the leak check is mandatory.
+
+## D-009: Spoilers allowed; mild bonus for early episodes
+- Date: 2026-11-07 · Owner: Harshit · Status: Accepted
+- Context: Should late reveals be used as hooks? Which promos should go first?
+- Decision: Allow spoilers (category leaders use payoff moments). Rank bonus +0.06 for episodes 1–5 and +0.03 for episodes 6–15, because those promos land the viewer at the start of the show.
+- Alternatives: Ban spoilers (loses the strongest hooks). No bonus.
+- Consequences: The ranking favours promos at the top of the funnel. Weights are tunable and should later be learnt from ad performance.
+- Reversible?: Yes.
+
+## D-010: Output a ranked shortlist for a human editor, not one "best" promo
+- Date: 2026-11-07 · Owner: Harshit · Status: Accepted
+- Context: Taste is subjective, and Kuku A/B tests creatives.
+- Decision: 15–25 diverse promos with risk flags. A human picks and trims.
+- Alternatives: Auto-post the top 1 (too risky; there's no performance data).
+- Consequences: Clear human-in-the-loop story. Adoption metric = % of posted promos that came from the shortlist.
+- Reversible?: Yes.
+
+## D-011: Temperature 0, versioned prompts, on-disk cache
+- Date: 2026-11-07 · Owner: Harshit · Status: Accepted
+- Context: Free-tier rate limits, plus the brief's "build something you can run again".
+- Decision: Cache keyed by model, prompt version and input hash. A manifest is written per run.
+- Alternatives: No cache (reruns burn quota and results drift).
+- Consequences: Reruns are free and reproducible. Stability is measured separately with the cache off.
+- Reversible?: Yes (`--no-cache`).
+
+## D-012: Simple, readable code; Streamlit app plus CLI; Python 3.11
+- Date: 2026-11-07 · Owner: Harshit · Status: Accepted
+- Context: Harshit has to explain every line, and the brief says polish earns nothing.
+- Decision: Plain functions and a minimal dependency list (TECH_SPEC §9). Streamlit for the hosted demo.
+- Alternatives: FastAPI with a React front end (more polish, no extra credit). No-code (harder to rerun and swap models).
+- Consequences: Fast to build, easy to defend in the interview.
+- Reversible?: Yes.
+
+<!-- Claude Code: append new decisions below as D-013, D-014, … with Status: Proposed -->
+
+## D-013: Use Python 3.13 for the venv (spec says 3.11+)
+- Date: 2026-11-07 · Owner: Claude · Status: Proposed
+- Context: The kit venv was Python 3.10 (below the 3.11 floor). Python 3.11 isn't installed on the dev machine; 3.13 is.
+- Decision: Recreate `.venv` with `py -3.13`. Code stays 3.11-compatible (no 3.12+/3.13-only syntax), so `python>=3.11` in TECH_SPEC §9 still holds.
+- Alternatives: Install 3.11 with winget (extra setup step, no benefit we need); keep 3.10 (violates the spec).
+- Consequences: All tests run on 3.13. Streamlit Cloud must be set to 3.11+ (pick 3.13 to match). The interview machine only needs 3.11+.
+- Reversible?: Yes (recreate the venv with 3.11 and `pip install -r requirements.txt`).
+
+## D-014: requirements.txt with exactly the §9 packages, pinned
+- Date: 2026-11-07 · Owner: Harshit · Status: Accepted
+- Context: TECH_SPEC §2 had no requirements file, but Streamlit Cloud and a reproducible interview run need one.
+- Decision: `requirements.txt` lists only the TECH_SPEC §9 packages, pinned to the versions the tests pass on. Added to the §2 layout.
+- Alternatives: Unpinned (a new LiteLLM release could break the live demo); pyproject/uv lock (more to explain).
+- Consequences: Reproducible installs. Pins must be bumped deliberately (re-run tests, update this file).
+- Reversible?: Yes.
+
+## D-015: Deterministic jump-cut construction
+- Date: 2026-11-07 · Owner: Harshit · Status: Accepted
+- Context: TECH_SPEC §4.3 said "s1_end roughly 12–25 s in" and "s2_start such that total ≤ 55 s", which allows many answers, and the PROCESS_GUIDE example gave no shot list.
+- Decision: s1_end = first shot boundary ≥ max(hook_end, start+12); else the last boundary in [hook_end, start+25]; else hook_end with flag `midshot_s1`. s2_start = earliest shot start after s1_end that keeps total ≤ 55 s and isn't inside a DIALOGUE block (else the next shot start). If s2_start would be after the cliff block's start, reject with `cliff_segment_too_long` (Claude's addition, so the cliff line is never chopped). PROCESS_GUIDE Process 3 now gives the exact shot list (93 s hook-to-cliff, 94.5 s snapped → 52 s).
+- Alternatives: Pick s2 to maximise length up to 60 s (less headroom for an editor's trim); let the LLM pick the cut (violates D-002 spirit: cuts are code).
+- Consequences: Same input always gives the same cut; the worked example is a unit test. Some long spans get rejected instead of producing a chopped cliff (visible in rejected.json).
+- Reversible?: Yes (thresholds in config).
+
+## D-016: Public logs carry only counts, IDs, timings and generic descriptions
+- Date: 2026-11-07 · Owner: Harshit · Status: Accepted
+- Context: report.md, decisions.md, ai_log.md and docs/phase_plans/ are pushed to a public repo, but PLAN asked for parse stats and smoke-test excerpts in report.md.
+- Decision: Public files hold only counts, block IDs, run IDs, timings and generic descriptions. Script text, speaker names and plot go to `private/` (parse_stats_T1.3.md, smoke_T3.5.md, ai_log_details.md) with a one-line pointer. Added to CLAUDE.md hard rule 3; PLAN T1.3/T3.5 updated.
+- Alternatives: Keep everything in report.md and scrub before push (one slip leaks the pack forever).
+- Consequences: Two places to read at checkpoints. The public log still shows the process; the details stay confidential.
+- Reversible?: No once pushed, hence the rule.
+
+## D-017: Leak check built at kickoff with three word lists, run before the first commit
+- Date: 2026-11-07 · Owner: Harshit · Status: Accepted
+- Context: The first scan found show-specific scene details in tracked docs (now made generic). A names-only check would have missed them.
+- Decision: `scripts/leak_check.py` checks every file git would publish against alias names (config/aliases.yaml), show keywords (private/leak_keywords.txt: title words, places, props, scene types) and 20 fixed-seed dialogue lines from input/. It runs before the first commit, before commits touching public logs, and before every push.
+- Alternatives: Build it at T6.4 as planned (too late: the first commit would already be in history).
+- Consequences: Some harmless generic words had to be reworded (e.g. a trope example in RESEARCH.md). The keyword list is a draft for Harshit to review at CP-1.
+- Reversible?: n/a
