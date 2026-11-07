@@ -82,3 +82,20 @@ A running log of every task Claude Code executes, in order. A new session must b
 **AI mistakes caught:** none
 **Open issues / risks:** none
 **Next:** T1.2
+
+### T1.2: Parser + tests  ·  2026-11-07  ·  status: done
+**Goal:** `parse.py` (Pydantic models, tolerant parser, pack loader) with synthetic and variant tests (TECH_SPEC §3, §10).
+**What I did:**
+- Tests first (RED: collection failed, module missing), then `promo_finder/parse.py` and `promo_finder/aliases.canonical_speaker`.
+- `test_parser.py`: exact counts per type for all 3 synthetic episodes; PROCESS_GUIDE blocks E03-B010/B011/B029–B031; capitalised scene headers; O.S./V.O. flags, including inside the emotion parens; multi-line text; duration; aliases.
+- `test_parser_variants.py`: HH:MM:SS, 1–3 decimals, CRLF, extra blank lines, no SOUND FX, unknown label, missing time line, end<start, outside scene, no dialogue, episode number from filename, lower-case keys, one-line scene start/end, zip with nested folder, sort by episode number, empty folder.
+- Probe on the real pack (counts only): parses cleanly.
+**Files changed:** promo_finder/{__init__,parse,aliases}.py, tests/{conftest,test_parser,test_parser_variants}.py
+**Commands & results:**
+    $ pytest -q → (RED) 2 errors during collection: No module named promo_finder.parse
+    $ pytest -q → 47 passed in 0.44s
+    $ real-pack probe → 50 episodes (1..50), 3727 blocks (CAMERA 1754, DIALOGUE 1487, ACTION 372, SOUND_FX 114), 1 warning (outside scene), durations 70.5–200.75 s, 0 empty texts
+**Decisions:** D-018 (parser tolerance rules, Proposed). D-014 requirements.txt already logged at kickoff.
+**AI mistakes caught:** none
+**Open issues / risks:** none
+**Next:** T1.3

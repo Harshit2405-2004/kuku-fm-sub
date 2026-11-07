@@ -157,3 +157,11 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Alternatives: Build it at T6.4 as planned (too late: the first commit would already be in history).
 - Consequences: Some harmless generic words had to be reworded (e.g. a trope example in RESEARCH.md). The keyword list is a draft for Harshit to review at CP-1.
 - Reversible?: n/a
+
+## D-018: Parser tolerance rules where TECH_SPEC §3 is silent
+- Date: 2026-11-07 · Owner: Claude · Status: Proposed
+- Context: §3.2 lists the warnings but not what happens to the affected block, or where speaker flags live.
+- Decision: (1) A block with no time line is skipped with a warning, and later IDs stay contiguous (so IDs always map to a timed block). (2) Speaker flags (O.S., V.O., O.C., CONT'D) are extracted from any paren group, including inside the emotion parens (the real pack has both forms), into a new `Block.flags` list. (3) A non-CAMERA/ACTION/SOUND FX label whose text isn't quoted becomes DIALOGUE with an "unquoted" warning (how we detect "unknown labels"). (4) "Outside its scene" uses a 0.1 s tolerance. (5) A scene missing start/end takes them from its blocks, with a warning. (6) Episodes are sorted by episode number, not filename; duplicates warn.
+- Alternatives: Fail the whole episode on a bad block (one typo would kill the live demo); keep untimed blocks with guessed times (code would invent timestamps).
+- Consequences: Never crashes on odd input, and every oddity is visible in the warnings. Skipping an untimed block shifts later IDs versus "position in file", which only matters if someone counts blocks by hand.
+- Reversible?: Yes.
