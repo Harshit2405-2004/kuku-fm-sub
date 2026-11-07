@@ -73,3 +73,11 @@ def test_dialogue_phrase_matches_case_insensitively(repo):
 def test_non_utf8_file_is_still_scanned(repo):
     (repo / "d.txt").write_bytes(b"\xff\xfe bad bytes Zorblax\n")
     assert leak_check.scan_working_tree(repo, WORDS, [])
+
+
+def test_alias_override_key_contributes_the_bare_label(tmp_path):
+    path = tmp_path / "aliases.yaml"
+    path.write_text('aliases:\n  THE STRANGER: Ellis\n  "E02:THE STRANGER": Old Fisherman\n', encoding="utf-8")
+    names = leak_check.names_from_aliases(path)
+    assert "THE STRANGER" in names and "Old Fisherman" in names
+    assert not any(n.startswith("E02:") for n in names)

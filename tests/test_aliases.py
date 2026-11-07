@@ -57,3 +57,31 @@ def test_pack_stats_on_synthetic_show(synth_dir):
     assert stats["raw_speakers"]["THE STRANGER"] == 2
     assert stats["speakers"]["Ellis"] == 5
     assert set(stats["speakers"]) == {"Mara", "Vera", "Ellis"}
+
+
+# --- per-episode override (D-026): one raw label that means two different people
+
+def test_episode_override_wins_for_its_episode_only():
+    aliases = {"THE STRANGER": "Ellis", "E02:THE STRANGER": "Old Fisherman"}
+    assert canonical_speaker("The Stranger", aliases, ep=2) == "Old Fisherman"
+    assert canonical_speaker("The Stranger", aliases, ep=3) == "Ellis"
+    assert canonical_speaker("The Stranger", aliases) == "Ellis"   # no episode given: global map
+
+
+def test_episode_override_keys_load_upper_cased_and_zero_padded(tmp_path):
+    path = tmp_path / "a.yaml"
+    path.write_text('aliases:\n  the stranger: Ellis\n  "e2:the stranger": Old Fisherman\n', encoding="utf-8")
+    aliases, _ = load_aliases(path)
+    assert aliases == {"THE STRANGER": "Ellis", "E02:THE STRANGER": "Old Fisherman"}
+
+
+def test_episode_override_applied_by_parser(synth_dir, tmp_path):
+    # Synthetic ep 1 has THE STRANGER lines; an E01 override renames only those.
+    path = tmp_path / "a.yaml"
+    path.write_text('aliases:\n  THE STRANGER: Ellis\n  "E01:THE STRANGER": Old Fisherman\n', encoding="utf-8")
+    aliases, _ = load_aliases(path)
+    eps, _ = load_pack(synth_dir, aliases)
+    by_ep = {e.ep: {b.speaker for b in e.blocks if b.speaker_raw and b.speaker_raw.upper() == "THE STRANGER"}
+             for e in eps}
+    assert by_ep[1] == {"Old Fisherman"}
+    assert all(names <= {"Ellis"} for ep, names in by_ep.items() if ep != 1)

@@ -277,7 +277,7 @@ def parse_episode_text(
         else:
             block_type = "DIALOGUE"
             speaker_raw, emotion, flags = parse_speaker_label(rb["label"])
-            speaker = canonical_speaker(speaker_raw, aliases)
+            speaker = canonical_speaker(speaker_raw, aliases, ep_num)
             text_value, quoted = _dialogue_text(rb["text"])
             if not quoted:
                 # Real dialogue is always quoted; an unquoted one is probably an unknown label.

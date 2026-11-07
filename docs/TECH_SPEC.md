@@ -207,7 +207,8 @@ final = base + bonus − penalty
 - Config per stage (in `config.yaml`):
 ```yaml
 models:
-  proposer: {model: "gemini/<current-flash-model-id>", api_base: null, api_key_env: GEMINI_API_KEY, temperature: 0, max_tokens: 4000}
+  proposer: {model: "gemini/<current-flash-model-id>", api_base: null, api_key_env: GEMINI_API_KEY, temperature: 0, max_tokens: 4000,
+             reasoning_effort: low}   # optional; null = provider default; part of the cache key (D-027)
   arc:      {model: "gemini/<current-flash-model-id>", ...}
   judge:    {model: "groq/<current-free-model-id>", api_key_env: GROQ_API_KEY, ...}
 concurrency: 2

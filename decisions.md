@@ -221,3 +221,28 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Alternatives: Wait for ad_observations before writing any prompt (blocks Phase 3); put the example in a separate file (harder to see what the model sees).
 - Consequences: Live check on the synthetic show: 4 candidates over 3 episodes, 0 invalid IDs, all cuts valid. Synthetic ep 3 is contaminated as a test (the model returned the prompt's own example), so it can't be used to judge prompt quality. Paste Harshit's exact brief wording into the prompt if available (v2).
 - Reversible?: Yes (prompt versioned; cache keys include the version).
+
+## D-026: Per-episode speaker-alias override
+- Date: 2026-11-07 · Owner: Harshit (choice of option b) / Claude (format) · Status: Proposed (Harshit chose option b; the key format is Claude's, so it needs his sign-off)
+- Context: The CP-1 alias evidence sheet showed that one descriptive speaker label means two different characters: one character in a single early episode (2 blocks) and another in 9 later episodes (51 blocks). A global label → name map can't express that. Details are in private/ai_log_details.md.
+- Decision: An alias key `"E<n>:LABEL"` (e.g. `"E02:LABEL"`) overrides `LABEL` for episode n only. `load_aliases` normalises it to `E02:LABEL` (upper case, zero-padded); `canonical_speaker(raw, aliases, ep)` checks the episode key first, then the global key, then falls back to title case. The parser passes the episode number. `leak_check.py` strips the `E<n>:` prefix so the bare label is still scanned for.
+- Alternatives: (a) keep the global mapping and accept 2 mislabelled blocks; they only feed context text, but the ranker or judge would attribute one character's lines to the main villain. (c) Per-block overrides (more precise, but nothing needs that today).
+- Consequences: Real pack after the change: 64 raw labels → 51 canonical speakers (was 52); the 2 blocks resolve to the right character; the other 51 are unchanged. A new show with no alias file is unaffected. 3 alias tests + 1 leak-check test.
+- Reversible?: Yes (delete the override line).
+
+## D-027: Proposer thinking budget set via config (`reasoning_effort: low`)
+- Date: 2026-11-07 · Owner: Claude · Status: Proposed
+- Context: Gemini 3.5 Flash spends about 2.3k hidden reasoning tokens per synthetic episode (T3.4). Over 50 real (longer) episodes, plus repair calls and run B, that eats the free daily quota and adds latency. Harshit asked whether the budget can be set from config.yaml, so a model swap still needs no code change.
+- Decision: Add an optional per-stage key `reasoning_effort` (minimal | low | medium | high | null). `llm.py` passes it to LiteLLM only when set. LiteLLM 1.108.2 maps this one OpenAI-style name to each provider's own control (Gemini 3 → `thinkingLevel`; OpenAI-compatible endpoints and Groq's gpt-oss take it as is). The value is part of the cache key, but only when set, so existing cache entries stay valid. If an endpoint answers 400 naming `reasoning_effort`, the call is retried once without it, like `response_format` (D-023). Set the **proposer to `low`**; arc and judge stay at the provider default until they are tested.
+- Evidence (synthetic show only, run `outputs/effort_synth_20261107_184345/`, proposer_v1, same prompts):
+
+  | setting | completion tokens (3 eps) | per ep | candidates | built valid | invalid IDs / repairs |
+  |---|---|---|---|---|---|
+  | default (cached T3.4 run) | 7,028 | 2,999 / 2,480 / 1,549 | 4 | 4/4 | 0 / 0 |
+  | **low** | **1,791 (−75%)** | 732 / 543 / 516 | 3 | 3/3 | 0 / 0 |
+  | minimal | 769 (−89%) | 405 / 213 / 151 | 4 | 4/4 | 0 / 0 |
+
+  Prompt tokens are identical (7,114). Ep 3 picked the same hook and cliff at all three settings, but it is contaminated (it's the prompt's worked example). On eps 1–2, low and minimal both chose a **different hook** from the default: a physical action or a revealing line placed earlier, rather than an entrance shot or a later line. Claude's read is that these are at least as strong; that's a judgement, not a measurement. low returned 1 candidate for ep 1 where the default returned 2. API latency was dominated by 503/429 retries, so it isn't comparable.
+- Alternatives: `minimal` (cheapest, and its picks matched low's, but it leaves the least room for reasoning on long real episodes with several scenes); keep the default (safe but 4× the tokens); a provider-specific `thinking` dict (not portable to Kuku's endpoint).
+- Consequences: About 4× fewer proposer completion tokens. Risk: 3 synthetic episodes is a tiny sample. **Check at T3.5:** run the smoke episodes at `low`, and run 1 of them at the default too, comparing picks (details private). If quality drops, set `reasoning_effort: null` in config.yaml; no code change needed. A swapped-in stronger model keeps `low` unless config says otherwise.
+- Reversible?: Yes (one config line).

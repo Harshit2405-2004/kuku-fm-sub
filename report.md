@@ -30,14 +30,14 @@ A running log of every task Claude Code executes, in order. A new session must b
 ---
 
 ## Status board
-**Deadline:** TBD (Harshit to fill in, IST) · **Submit by:** deadline − 3 h
+**Deadline:** 2026-11-08 20:00 IST · **Submit by:** 2026-11-08 17:00 IST · **If short on time:** drop arc promos first, then run B
 
 | Phase | Status | Last task | Notes |
 |---|---|---|---|
-| 0 Setup | ☑ | T0-fix | venv 3.13, git init, kit + doc fixes committed (fc4c4b7). Deadline still TBD. |
-| 1 Parser | ☑ (aliases pending) | CP-1 fixes | 89 tests; 50/50 eps; 0 unassigned lines; alias evidence sheet ready (private/alias_evidence.md), awaiting Harshit's decision |
+| 0 Setup | ☑ | T0-fix | venv 3.13, git init, kit + doc fixes committed (fc4c4b7). Deadline set at CP-1 leftovers. |
+| 1 Parser | ☑ | CP-1 leftovers | 50/50 eps; 0 unassigned lines; aliases final (0 VERIFY, per-episode override D-026); 51 canonical speakers |
 | 2 Gold | ☐ | | Harshit |
-| 3 LLM/propose/build | ◐ T3.1–T3.4 done | T3.4 | 142 tests; T3.5 waits for "Gold labels done" |
+| 3 LLM/propose/build | ◐ T3.1–T3.4 done | CP-1 leftovers | 150 tests; proposer reasoning_effort=low (D-027); T3.5 waits for "Gold labels done" |
 | 4 Arcs/judge/rank/run A | ☐ | | |
 | 5 Eval / run B | ☐ | | |
 | 6 App/deploy | ☐ | | |
@@ -269,3 +269,29 @@ A running log of every task Claude Code executes, in order. A new session must b
   3. "Gold labels done" + the gold episode numbers. Then: read `gold/ad_observations.md` ONLY (never gold_labels.csv), write proposer_v2, and run the T3.5 smoke test on 3 non-gold real episodes (details → private/smoke_T3.5.md, counts → here). Then /checkpoint CP-2 and STOP.
   4. Approval of D-021 through D-025 (Proposed).
 - Next task: T3.5 (blocked). Do not start Phase 4 before CP-2.
+
+### CP-1 leftovers: aliases final, leak keywords, deadline, thinking budget  ·  2026-11-07  ·  status: done
+**Goal:** Apply Harshit's CP-1 decisions (aliases, leak keywords, deadline) and test whether the proposer's hidden-reasoning budget can be set from config.
+**What I did:**
+- **Aliases:** applied all 8 proposals from private/alias_evidence.md to config/aliases.yaml, which now has 0 VERIFY tags. Changes vs the T1.3 draft: 1 label re-pointed in 1 episode (via a new per-episode override, D-026), 1 unmapped label mapped to an existing character, 1 explicit identity entry + cast line, 2 labels confirmed as separate speakers, 2 kept but marked "likely, not proven" in a comment.
+- **Override code (TDD):** `"E<n>:LABEL"` keys in `aliases.py`; the parser passes the episode number; `leak_check.py` scans the bare label. 3 alias tests + 1 leak-check test (RED, then GREEN).
+- **Logs:** ai_log.md #4 (generic); names in private/ai_log_details.md (new).
+- **Leak keywords:** surnames and places as single words, including plural forms, since word-boundary matching misses them. 11 spellings of the estate name found (5 listed by Harshit + 6 more found by grep). Continuity note with episodes per spelling in private/INPUT_PACK_NOTES.md; the notes' wrong alias guess is marked as corrected there.
+- **Deadline** 2026-11-08 20:00 IST, submit by 17:00, cut order (arc promos first, then run B) added to PLAN.md, INSTRUCTIONS.md and the status board.
+- **Thinking budget:** optional per-stage `reasoning_effort` key (config only; part of the cache key when set; dropped and retried if an endpoint rejects it). 4 tests. Compared default / low / minimal on the synthetic show; proposer set to `low` (D-027).
+**Files changed:** promo_finder/{aliases,parse,llm,cache}.py, scripts/leak_check.py, tests/{test_aliases,test_leak_check,test_llm}.py, config.yaml, docs/{PLAN,TECH_SPEC}.md, INSTRUCTIONS.md, decisions.md, ai_log.md, report.md. Private only: config/aliases.yaml, private/{leak_keywords.txt, INPUT_PACK_NOTES.md, ai_log_details.md (new)}.
+**Commands & results:**
+    $ pytest -q tests/test_aliases.py → (RED) 3 failed, 7 passed; after the fix: 146 passed (with the leak-check test)
+    $ pytest -q tests/test_llm.py → (RED) 4 failed, 15 passed; after the fix: pytest -q → 150 passed in 12.85s
+    $ python -m promo_finder.parse --input input/<pack> --speakers   (before → after)
+      episodes 50 · scenes 100 · blocks 3,727 (CAMERA 1,754 · ACTION 372 · DIALOGUE 1,487 · SOUND_FX 114): unchanged
+      line coverage 11,931/11,931, 0 unassigned; warnings 1 (the known E22-B023): unchanged
+      distinct raw speakers 64 · canonical 52 → 51
+    override check: E02-B028, E02-B030 → the ep-2 character (was the later character); the other 51 blocks with that label: unchanged
+    $ python scripts/leak_check.py --pre-push → 31 alias names, 49 keywords, 20 dialogue lines [+ full history] → PASS
+    effort comparison (synthetic, outputs/effort_synth_20261107_184345/): completion tokens default 7,028 · low 1,791 · minimal 769;
+      candidates 4 / 3 / 4, all built valid, 0 invalid IDs, 0 repairs (full table in D-027)
+**Decisions:** D-026 (per-episode alias override, Proposed; option b chosen by Harshit), D-027 (proposer reasoning_effort=low, Proposed)
+**AI mistakes caught:** ai_log #4: the alias draft merged two characters under one descriptive label (and the AI-written pack notes had guessed a third, also wrong). Caught by the evidence sheet; the final call was Harshit's.
+**Open issues / risks:** (1) 5 named speaker labels that aren't in aliases.yaml are not checked by leak_check (it reads names from aliases.yaml + keywords only). See the chat summary; Harshit to decide whether to add them as keywords. (2) D-027 rests on 3 synthetic episodes; re-check on real episodes at T3.5. (3) Approval pending: D-021 to D-027.
+**Next:** T3.5, blocked on "Gold labels done" + the gold episode numbers.

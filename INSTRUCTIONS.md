@@ -4,7 +4,7 @@ Follow these steps top to bottom. Each step says **who** does it (🧑 you, 🤖
 
 To understand *what* each process does, read `docs/PROCESS_GUIDE.md`. For *why* we chose it, read `private/EXPLANATION.md`.
 
-> ⏰ **Deadline:** `TBD — Harshit to fill in (DATE TIME IST)` (48 hours from when Kuku's email arrived). **Submit by:** `deadline − 3 h`.
+> ⏰ **Deadline:** **2026-11-08 20:00 IST** (48 hours from when Kuku's email arrived). **Submit by:** **2026-11-08 17:00 IST**. If time runs short: drop arc promos first, then run B (docs/PLAN.md).
 
 ---
 

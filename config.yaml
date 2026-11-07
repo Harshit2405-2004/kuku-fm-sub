@@ -11,6 +11,10 @@ models:
     api_key_env: GEMINI_API_KEY
     temperature: 0
     max_tokens: 4000
+    # Hidden "thinking" budget: minimal | low | medium | high, or null for the provider default.
+    # LiteLLM maps it per provider (Gemini 3: thinkingLevel). An endpoint that rejects it is retried
+    # without it. low cut completion tokens by 75% on the synthetic show with no loss in clip validity (D-027).
+    reasoning_effort: low
   arc:
     model: gemini/gemini-3.5-flash
     api_base: null

@@ -189,3 +189,38 @@ def test_summarize_usage_per_stage():
     assert s["proposer"] == {"calls": 2, "cache_hits": 1, "prompt_tokens": 150, "completion_tokens": 15,
                              "latency_s": 1.0, "models": ["m"]}
     assert s["judge"]["calls"] == 1
+
+
+# --- reasoning_effort (D-027): an optional per-stage config key, passed straight to LiteLLM
+
+def test_reasoning_effort_passed_only_when_configured(cfg):
+    fake = FakeCompletion(response(GOOD))
+    run(cfg, fake)
+    assert "reasoning_effort" not in fake.calls[0]
+    cfg["models"]["proposer"]["reasoning_effort"] = "low"
+    fake = FakeCompletion(response(GOOD))
+    run(cfg, fake, version="test_v2")
+    assert fake.calls[0]["reasoning_effort"] == "low"
+
+
+def test_reasoning_effort_is_part_of_the_cache_key(cfg):
+    run(cfg, FakeCompletion(response(GOOD)))
+    cfg["models"]["proposer"]["reasoning_effort"] = "low"
+    fake = FakeCompletion(response(GOOD))
+    (_, _), usage, _ = run(cfg, fake)
+    assert len(fake.calls) == 1 and usage[0]["cache_hit"] is False
+
+
+def test_cache_key_unchanged_when_reasoning_effort_unset():
+    # Existing cache entries (made before D-027) must stay valid.
+    assert cache_key("m", "v1", MESSAGES, "Answer") == cache_key("m", "v1", MESSAGES, "Answer", reasoning_effort=None)
+    assert cache_key("m", "v1", MESSAGES, "Answer") != cache_key("m", "v1", MESSAGES, "Answer", reasoning_effort="low")
+
+
+def test_endpoint_rejecting_reasoning_effort_is_retried_without_it(cfg):
+    cfg["models"]["proposer"]["reasoning_effort"] = "low"
+    fake = FakeCompletion(HTTPError(400, "Unsupported parameter: reasoning_effort"), response(GOOD))
+    (parsed, _), _, _ = run(cfg, fake)
+    assert parsed.block_id == "E03-B011"
+    assert "reasoning_effort" in fake.calls[0]
+    assert "reasoning_effort" not in fake.calls[1]

@@ -50,6 +50,10 @@ def _completion_kwargs(stage_cfg: dict, messages: list[dict], schema: type[BaseM
               "temperature": stage_cfg.get("temperature", 0), "max_tokens": stage_cfg.get("max_tokens", 4000)}
     if stage_cfg.get("api_base"):
         kwargs["api_base"] = stage_cfg["api_base"]
+    # Optional thinking budget ("minimal"/"low"/"medium"/"high"). LiteLLM maps this one OpenAI-style
+    # name to each provider's own control (Gemini 3: thinkingLevel), so it is config-only (D-027).
+    if stage_cfg.get("reasoning_effort"):
+        kwargs["reasoning_effort"] = stage_cfg["reasoning_effort"]
     key_env = stage_cfg.get("api_key_env")
     if key_env:
         key = os.environ.get(key_env)
@@ -67,7 +71,7 @@ def _completion_kwargs(stage_cfg: dict, messages: list[dict], schema: type[BaseM
 
 
 def _call_with_retries(completion_fn: Callable, kwargs: dict, retries: dict, sleep: Callable):
-    """Exponential backoff on 429/5xx. If an endpoint rejects response_format, retry once without it."""
+    """Exponential backoff on 429/5xx. If an endpoint rejects response_format or reasoning_effort, drop it."""
     max_attempts = retries.get("max_attempts", 5)
     base = retries.get("backoff_base_s", 2)
     for attempt in range(1, max_attempts + 1):
@@ -75,9 +79,12 @@ def _call_with_retries(completion_fn: Callable, kwargs: dict, retries: dict, sle
             return completion_fn(**kwargs)
         except Exception as error:
             status = _status(error)
-            if status == 400 and "response_format" in kwargs and "response_format" in str(error):
-                log.warning("%s rejected response_format; retrying without it", kwargs["model"])
-                kwargs = {k: v for k, v in kwargs.items() if k != "response_format"}
+            # Optional params some endpoints reject: drop the one named in the error and try again.
+            rejected = next((p for p in ("response_format", "reasoning_effort")
+                             if p in kwargs and p in str(error)), None)
+            if status == 400 and rejected:
+                log.warning("%s rejected %s; retrying without it", kwargs["model"], rejected)
+                kwargs = {k: v for k, v in kwargs.items() if k != rejected}
                 continue
             if status not in RETRYABLE_STATUS or attempt == max_attempts:
                 raise
@@ -96,8 +103,10 @@ def call_llm(stage: str, messages: list[dict], schema: type[BaseModel], cfg: dic
     """
     stage_cfg = cfg["models"][stage]
     model = "mock" if cfg.get("mock") else stage_cfg["model"]
-    key = cache_key(model, prompt_version, messages, schema.__name__)
+    key = cache_key(model, prompt_version, messages, schema.__name__,
+                    reasoning_effort=None if cfg.get("mock") else stage_cfg.get("reasoning_effort"))
     record = {"stage": stage, "model": model, "prompt_version": prompt_version,
+              "reasoning_effort": None if cfg.get("mock") else stage_cfg.get("reasoning_effort"),
               "prompt_tokens": 0, "completion_tokens": 0, "latency_s": 0.0, "cache_hit": False}
 
     if cfg.get("mock"):

@@ -40,7 +40,8 @@ def names_from_aliases(path: Path) -> list[str]:
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     names: set[str] = set()
     for raw, canonical in (data.get("aliases") or {}).items():
-        names.update([str(raw), str(canonical)])
+        # Per-episode override keys look like "E02:LABEL"; the label is the sensitive part.
+        names.update([re.sub(r"^E\d+:\s*", "", str(raw), flags=re.IGNORECASE), str(canonical)])
     names.update(str(name) for name in (data.get("cast") or {}))
     return sorted(names)
 

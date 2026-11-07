@@ -4,7 +4,9 @@
 **CP-x = checkpoint.** Claude Code stops, summarises in report.md, and waits for Harshit's "go".
 Time estimates are working time. Claude Code's run time overlaps with Harshit's tasks.
 
-**Deadline:** 48 hours from the brief email = `TBD — Harshit to fill in (DATE TIME IST)`. **Submit at least 3 hours early.** Late submissions aren't reviewed.
+**Deadline:** **2026-11-08 20:00 IST** (48 hours from the brief email). **Submit by 2026-11-08 17:00 IST** (3 hours early). Late submissions aren't reviewed.
+
+**If time runs short (Harshit, 2026-11-07), cut in this order:** (1) drop arc promos (T4.1; single-episode clips only, and say so in the doc); (2) then drop run B (T5.3; report run A only, and say the model-swap comparison wasn't run). Never cut: the 20–60 s validity checks, the leak check, or honest reporting.
 
 ```
 Phase 0 Setup (🧑 45m)
