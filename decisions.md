@@ -213,3 +213,11 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Alternatives: Honour the model's start/end blocks (gives up code control of the two hardest constraints, against D-002's spirit); keep under-20 s jump-cuts with dur_ok=false (an invalid clip in the list).
 - Consequences: Validity is guaranteed by construction (EVAL check 1). The model's start/end picks can still be compared with ours in the failure gallery.
 - Reversible?: Yes.
+
+## D-025: Proposer prompt v1 and stage details
+- Date: 2026-11-07 · Owner: Claude · Status: Proposed
+- Context: TECH_SPEC §4.2/§6 want the brief's promo definition verbatim, 3 hook patterns from gold/ad_observations.md, and ≤ 2 synthetic examples. ad_observations.md may not be read until Harshit says "Gold labels done", and the brief's exact wording isn't stored in the repo.
+- Decision: (1) v1 quotes the brief fragments recorded in docs/BRIEF_COMPLIANCE.md §B (the closest verbatim text we have). (2) v1's 3 opening patterns come from public category research (docs/RESEARCH.md §3); proposer_v2 will swap in Harshit's observed patterns after the gold labels. (3) One worked example (synthetic ep 3, from PROCESS_GUIDE). (4) `reasoning` is the first field, so the model explains before choosing IDs (§4.5 uses the same idea). (5) The order check is start ≤ hook ≤ cliff by start time and end_block ending at or after the cliff, because end_block may be the shot the cliff sits in, which starts before the cliff line. (6) One repair round for bad IDs or order, then drop and log. (7) Mock proposer: the first line with "?"/"!" (else any line) that has a later line 15–45 s after it to cut on.
+- Alternatives: Wait for ad_observations before writing any prompt (blocks Phase 3); put the example in a separate file (harder to see what the model sees).
+- Consequences: Live check on the synthetic show: 4 candidates over 3 episodes, 0 invalid IDs, all cuts valid. Synthetic ep 3 is contaminated as a test (the model returned the prompt's own example), so it can't be used to judge prompt quality. Paste Harshit's exact brief wording into the prompt if available (v2).
+- Reversible?: Yes (prompt versioned; cache keys include the version).

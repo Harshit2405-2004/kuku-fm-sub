@@ -35,9 +35,9 @@ A running log of every task Claude Code executes, in order. A new session must b
 | Phase | Status | Last task | Notes |
 |---|---|---|---|
 | 0 Setup | ☑ | T0-fix | venv 3.13, git init, kit + doc fixes committed (fc4c4b7). Deadline still TBD. |
-| 1 Parser | ◐ CP-1 waiting | T1.4 | 68 tests; real pack 50/50 eps parsed; alias map awaits Harshit |
+| 1 Parser | ☑ (aliases pending) | CP-1 fixes | 89 tests; 50/50 eps; 0 unassigned lines; alias corrections not yet received |
 | 2 Gold | ☐ | | Harshit |
-| 3 LLM/propose/build | ☐ | | |
+| 3 LLM/propose/build | ◐ T3.1–T3.4 done | T3.4 | 142 tests; T3.5 waits for "Gold labels done" |
 | 4 Arcs/judge/rank/run A | ☐ | | |
 | 5 Eval / run B | ☐ | | |
 | 6 App/deploy | ☐ | | |
@@ -217,3 +217,24 @@ A running log of every task Claude Code executes, in order. A new session must b
 **AI mistakes caught:** two wrong test fixtures (Claude), caught by hand-checking the expected numbers before implementing; not logged in ai_log since they never reached a test run
 **Open issues / risks:** none
 **Next:** T3.4
+
+### T3.4: Proposer prompt v1 + propose.py + mock proposer  ·  2026-11-07  ·  status: done
+**Goal:** `prompts/proposer.md` (proposer_v1) and the proposer stage: IDs-only schema, validation, one repair round, raw replies saved unedited, a mock reply for --mock.
+**What I did:**
+- Tests first (RED: collection error), then `llm.load_prompt` (version header → cache key), `propose.py` (`ProposalCandidate`/`EpisodeProposals` with the beat_type enum, `build_messages`, `validate_proposals`, `propose_episode`), and `mock.mock_proposer`.
+- Prompt v1: brief fragments, 3 public-research opening patterns (Harshit's ad observations come in v2), visual-hook instruction, zero-candidates allowed, never write times, 1 synthetic worked example.
+- Mock test: every synthetic episode gets a candidate that build.py turns into a valid clip.
+- Live check on the synthetic show only (fictional): real proposer through the full path.
+**Files changed:** promo_finder/{propose,mock,llm}.py, promo_finder/prompts/proposer.md, tests/test_propose.py
+**Commands & results:**
+    $ pytest -q tests/test_propose.py → (RED) 1 error during collection
+    $ pytest -q → 142 passed in 9.06s
+    live (synthetic show, gemini/gemini-3.5-flash, proposer_v1): 2 × HTTP 503 → backoff 2 s, 4 s → recovered
+      E01: 2 candidates → P01-1 single 46.0 s hook@1.0 s (ACT hook); P01-2 single 46.0 s hook@0.5 s; all checks true
+      E02: 1 candidate → P02-1 single 25.0 s hook@1.0 s; all checks true
+      E03: 1 candidate → P03-1 12.0–47.0, 35.0 s (identical to the prompt's worked example: contaminated test)
+      usage: 3 calls, 7114 prompt / 7028 completion tokens, 68.5 s
+**Decisions:** D-025 (prompt v1 and stage details, Proposed)
+**AI mistakes caught:** none by the runtime model (0 invalid IDs). Note: the E03 result is not evidence of quality.
+**Open issues / risks:** About 2.3k completion tokens per episode (hidden reasoning), so a full run is about 120k completion tokens; check the free-tier daily token quota. Waiting for "Gold labels done" before T3.5 (smoke test on 3 non-gold real episodes) and proposer_v2 (ad_observations patterns).
+**Next:** T3.5 (blocked on Harshit)

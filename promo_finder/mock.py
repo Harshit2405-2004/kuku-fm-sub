@@ -7,7 +7,52 @@ real reply. Used by tests and by the demo app when no key is available.
 
 from __future__ import annotations
 
+import json
+import re
+
+# One compact line: [E03-B011 00:13.0–00:14.8] MARA (Stunned): "You sold the house?"
+LINE = re.compile(r"^\[(?P<id>E\d+-B\d+) (?P<start>\d+:\d+\.\d)–(?P<end>\d+:\d+\.\d)\] (?P<who>[^:]+): (?P<text>.*)$")
+NON_DIALOGUE = {"CAM", "ACT", "SFX"}
+
+
+def _seconds(tc: str) -> float:
+    minutes, seconds = tc.split(":")
+    return int(minutes) * 60 + float(seconds)
+
+
+def _lines(messages: list[dict]) -> list[dict]:
+    text = messages[-1]["content"] if messages else ""
+    out = []
+    for line in text.splitlines():
+        m = LINE.match(line.strip())
+        if m:
+            out.append({"id": m["id"], "start": _seconds(m["start"]), "end": _seconds(m["end"]),
+                        "dialogue": m["who"] not in NON_DIALOGUE, "text": m["text"]})
+    return out
+
+
+def mock_proposer(messages: list[dict]) -> dict:
+    """Hook = first questioning/exclaiming line (else any line) that has a later line 15–45 s after it
+    to cut on; cliff = the last such line. Simple, deterministic, and always buildable."""
+    text = messages[-1]["content"] if messages else ""
+    ep_match = re.search(r"EPISODE (\d+)", text)
+    episode = int(ep_match.group(1)) if ep_match else 0
+    dialogue = [l for l in _lines(messages) if l["dialogue"]]
+    punchy = [l for l in dialogue if "?" in l["text"] or "!" in l["text"]]
+    for hook in punchy + dialogue:
+        later = [l for l in dialogue if hook["start"] + 15 <= l["start"] <= hook["start"] + 45]
+        if later:
+            cliff = later[-1]
+            return {"episode": episode, "candidates": [{
+                "reasoning": "mock: first punchy line, cut on the last line 15–45 s later",
+                "start_block": hook["id"], "hook_block": hook["id"], "cliff_block": cliff["id"],
+                "end_block": cliff["id"], "beat_type": "other",
+                "hook_summary": hook["text"][:80], "cliff_summary": cliff["text"][:80]}]}
+    return {"episode": episode, "candidates": []}
+
 
 def respond(stage: str, messages: list[dict]) -> str:
     """Return the raw JSON text a model would have returned for this stage."""
+    if stage == "proposer":
+        return json.dumps(mock_proposer(messages))
     raise NotImplementedError(f"mock reply for stage '{stage}' not built yet")

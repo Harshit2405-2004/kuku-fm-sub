@@ -12,6 +12,7 @@ import logging
 import os
 import re
 import time
+from pathlib import Path
 from typing import Callable
 
 from pydantic import BaseModel, ValidationError
@@ -160,3 +161,22 @@ def summarize_usage(usage: list[dict]) -> dict:
         if r["model"] not in s["models"]:
             s["models"].append(r["model"])
     return summary
+
+
+PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
+
+
+def load_prompt(name: str) -> tuple[str, dict[str, str]]:
+    """Read prompts/<name>.md -> (version, {"system": ..., "user": ...}).
+
+    The version comes from the `<!-- version: x -->` header and goes into the cache key and
+    the manifest, so editing a prompt without bumping it would serve stale cached replies.
+    """
+    text = (PROMPTS_DIR / f"{name}.md").read_text(encoding="utf-8")
+    version = re.search(r"<!--\s*version:\s*(\S+)\s*-->", text)
+    if not version:
+        raise ValueError(f"prompt {name}.md has no version header")
+    body = re.sub(r"<!--.*?-->\n?", "", text, flags=re.DOTALL)
+    parts = re.split(r"^## (SYSTEM|USER)\s*$", body, flags=re.MULTILINE)
+    sections = {parts[i].lower(): parts[i + 1].strip() for i in range(1, len(parts) - 1, 2)}
+    return version.group(1), sections
