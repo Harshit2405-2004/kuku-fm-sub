@@ -551,3 +551,33 @@ A running log of every task Claude Code executes, in order. A new session must b
   (5) the judge excerpt drops a dialogue line already playing at a single's start (its tail is audible);
   (6) the lowered max_tokens isn't reused on the JSON-repair retry.
   Nits: the "moved down" label when nothing moved, a test name, bracket the arc flag expression, arc ID gaps, recovered judge batches counted as errors, stale "arcs: not run" wording in D-038 and T4.4, retry constants in config.
+
+### Run A completed (resume, D-041 applied) + ranker gate (D-042) + model table  ·  2026-11-08 04:15–04:50  ·  status: done, PARTIAL coverage (26/50 episodes)
+**Goal:** Finish run A with the same prompts: 18 episodes on gpt-oss-120b (cache) and the 32 missing ones on gpt-oss-20b (Groq). OpenRouter's key was rejected (HTTP 401 "User not found"), so the fallback in the decision was used (D-041).
+**What I did:**
+- Fixed the CP-3 reviewer item (1), the `arc_` prefix overwritten by `**r` (commit c1dbcf6). Added `--run-dir` and `--episode-proposer` (manifest: `proposer_model_by_episode`), 4 tests. ai_log #12 (a `.env` echo, no key text).
+- Resumed in `outputs/20261107-2103-runA`. **Episodes processed: 26/50. Not processed: 24** (E03, 25, 26, 27, 30–39, 41–50). Causes: 17 on gpt-oss-20b's **daily** token limit, 5 per-minute limit after retries, 2 `json_validate_failed`. Per Harshit's rule I did not retry or switch models again (the 20b daily limit is spent, so a retry would fail anyway). Gold episodes processed: 1, 8, 12, 17, 18 (of 10); E03, 27, 31, 42, 45 were NOT processed, so gold recall is computed on the processed ones only.
+- Step 1, ranker gate (D-042, `rank.min_cliff_top10: 3`): re-ranked from the saved scores, no LLM calls. **Clips with cliff ≤ 2 moved out of the top 10: 0.** None was in the top 10 before the gate (the larger pool pushed all 12 cliff-2 clips below rank 10); top-10 cliffs are 5,5,5,5,5,4,5,4,4,3. 3 new tests.
+- Judge: qwen3.8-27b for all 32 clips (one judge, no mixing); 1 judge batch needed a clip-by-clip retry; 0 unscored. Arcs: 1 call (gpt-oss-120b), 5 built, 0 rejected.
+**Commands & results:**
+    $ python run.py --input input/<pack> --config config.yaml --run-name runA --run-dir outputs/20261107-2103-runA --episode-proposer "3,17-18,20-23,25-39,41-50=groq/openai/gpt-oss-20b" → done · 2,002 s wall
+      proposer: 26 calls (18 cache hits) · 125,395 prompt / 61,610 completion tokens · 1,650 s (propose+build) · arcs: 1 call, 2,758 / 2,123 tokens, 5 s · judge: 12 calls (6 cache hits), 61,918 / 5,405 tokens, 347 s
+      counts: proposed 32 · built 32 (27 singles/jumpcuts + 5 arcs) · rejected 4 · scored 32 · ranked 32 · diversity skips 3 · 21 episodes with a clip
+      ranked: 16 single + 11 jumpcut + 5 arc · 22.3–54.9 s · hook ≤ 3 s: 32/32 · risk flags: needs_context 11, graphic_violence 6, slow_middle 6, confusing_cut 1
+      judge cliff (count): 2:12 · 3:2 · 4:6 · 5:12
+      top 3: P15-1, P05-1, ARC-1
+    $ pytest -q → 264 passed
+**By proposer model (run A, singles and jumpcuts; arcs excluded):**
+
+| proposer model | episodes processed | not processed | proposals | built | singles ranked | mean hook | mean cliff | mean standalone |
+|---|---|---|---|---|---|---|---|---|
+| groq/openai/gpt-oss-120b | 18 | 0 | 23 | 20 | 20 | 4.05 | 3.45 | 4.10 |
+| groq/openai/gpt-oss-20b | 8 | 24 | 9 | 7 | 7 | 3.86 | 3.57 | 3.43 |
+
+Different episodes, so it's indicative, not a controlled comparison. Arc promos are excluded (they pair clips from both groups). Proposals = built + rejected (builder checks, duplicates) + proposer drops.
+
+**Decisions:** D-041 (Accepted, deviation stated), D-042 (Accepted), D-034–D-040 Accepted, D-043 (limitations)
+**AI mistakes caught:** ai_log #12
+**Limitations (reviewer CP-3 items 2–6 left unfixed, Harshit):** duplicate arc picks are not deduped; a crash outside the per-episode/batch handlers leaves no manifest; the mock test lacks arcs_raw.json, an arc row and the keep-going-on-failure path; the judge excerpt drops a dialogue line already playing at a single's start; the lowered max_tokens is not reused on the JSON-repair retry. Also: **run A covers 26 of 50 episodes** and mixes two proposer sizes; qwen's daily tokens can't be read from Groq headers, so the judge ran without that check (it finished).
+**Open issues / risks:** half of the pack is unprocessed; E03, 27, 31, 42, 45 (gold) have no run A output. Free-tier daily token caps (200k/day per Groq model) are the binding limit: about 7k tokens per episode.
+**Next:** run B (D-032), eval, blind sheet
