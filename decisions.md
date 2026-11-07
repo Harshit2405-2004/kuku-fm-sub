@@ -197,3 +197,11 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Alternatives: `gemini/gemini-3.8-flash` (newest; the call succeeded but took 157.9 s for 1 token, and one blog reports only ~20 requests/day on the free tier, which can't cover 50 episodes). Free-tier quotas are not published by API; Harshit should confirm them in AI Studio / the Groq console.
 - Consequences: LiteLLM warns that `temperature` is "planned for removal" for Gemini 3+. It works today and we keep temperature 0 (hard rule 8), but this is a known future break. With max_tokens=1 Gemini returned no text (reasoning tokens), so real calls need enough max_tokens (4000 set).
 - Reversible?: Yes (config.yaml or --proposer-model / --judge-model).
+
+## D-023: LLM-layer details where TECH_SPEC §5 is silent
+- Date: 2026-11-07 · Owner: Claude · Status: Proposed
+- Context: §5 fixes LiteLLM, per-stage config, retries and the cache, but not how flags combine, what gets cached, or how odd endpoints are handled.
+- Decision: (1) `--api-base` / `--api-key-env` apply to the stages whose model was overridden on the CLI, or to all stages if no model flag was given, so "upgrade only the judge" keeps the free proposer. (2) `call_llm` returns (validated object, raw text) so stages can save raw replies unedited (FR8). (3) Only the final valid reply is cached; every attempt is recorded in usage. (4) Retry on HTTP 408/429/5xx with backoff 2, 4, 8… s; other errors fail fast. (5) If an endpoint rejects `response_format`, retry once without it and validate JSON extracted from the text (fences and prose stripped). (6) Schema-constrained output is requested when `litellm.supports_response_schema` says yes, JSON mode otherwise. (7) A missing key env var is a clear error naming the variable; key values are never stored.
+- Alternatives: tenacity for retries (optional per §9; a 10-line loop is easier to explain); caching every attempt (would make a bad reply "stick").
+- Consequences: Kuku's endpoint works even without JSON-schema support. Live check: both default models returned schema-valid JSON. Gemini 3.5 Flash billed 480 completion tokens for a ~170-character answer (hidden reasoning tokens), so token budgets and the cost estimate must use the reported usage, not the visible text.
+- Reversible?: Yes.

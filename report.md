@@ -186,3 +186,19 @@ A running log of every task Claude Code executes, in order. A new session must b
 **AI mistakes caught:** ai_log #3 (web sources unreliable for model IDs)
 **Open issues / risks:** Free-tier daily quotas are unverified (Harshit to check AI Studio / Groq console). Gemini 3+ temperature deprecation warning.
 **Next:** T3.2
+
+### T3.2: config + cache + llm + mock  ·  2026-11-07  ·  status: done
+**Goal:** One swappable, cached, validated LLM call path with retries and usage accounting (TECH_SPEC §5).
+**What I did:**
+- Tests first (RED: collection errors), then `config.py` (load + CLI override rules), `cache.py` (sha256 key, atomic write), `llm.py` (`call_llm`, backoff, `response_format` fallback, JSON extraction and one repair retry, usage, `summarize_usage`), and a `mock.py` stub (mock replies come in T3.4).
+- 22 new tests with a fake completion function (no network).
+- Live check outside pytest (scratch script, temp cache): one tiny schema call per default model through `call_llm`.
+**Files changed:** promo_finder/{config,cache,llm,mock}.py, tests/{test_config,test_llm}.py, docs/phase_plans/phase-3.md
+**Commands & results:**
+    $ pytest -q → (RED) 2 errors during collection; then 111 passed in 7.88s
+    live: proposer gemini/gemini-3.5-flash → valid JSON (E03-B011); judge groq/openai/gpt-oss-120b → valid JSON (E03-B011); repeat call cache_hit=True
+    live usage: proposer 2 calls (1 cache hit), 206 prompt / 480 completion tokens, 5.43 s; judge 1 call, 256 / 175 tokens, 0.67 s
+**Decisions:** D-023 (LLM-layer details, Proposed)
+**AI mistakes caught:** none
+**Open issues / risks:** Gemini's hidden reasoning tokens inflate completion tokens (480 for a tiny answer). Watch the free-tier token quotas in the full run.
+**Next:** T3.3
