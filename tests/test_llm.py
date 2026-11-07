@@ -211,10 +211,13 @@ def test_reasoning_effort_is_part_of_the_cache_key(cfg):
     assert len(fake.calls) == 1 and usage[0]["cache_hit"] is False
 
 
-def test_cache_key_unchanged_when_reasoning_effort_unset():
-    # Existing cache entries (made before D-027) must stay valid.
-    assert cache_key("m", "v1", MESSAGES, "Answer") == cache_key("m", "v1", MESSAGES, "Answer", reasoning_effort=None)
-    assert cache_key("m", "v1", MESSAGES, "Answer") != cache_key("m", "v1", MESSAGES, "Answer", reasoning_effort="low")
+def test_cache_key_includes_every_output_changing_request_setting():
+    base = {"api_base": None, "temperature": 0, "max_tokens": 4000, "reasoning_effort": None}
+    key = cache_key("m", "v1", MESSAGES, "Answer", base)
+    for name, value in [("api_base", "https://other.example/v1"), ("temperature", 0.7),
+                        ("max_tokens", 3000), ("reasoning_effort", "low")]:
+        assert key != cache_key("m", "v1", MESSAGES, "Answer", {**base, name: value}), name
+    assert key == cache_key("m", "v1", MESSAGES, "Answer", dict(base))
 
 
 def test_endpoint_rejecting_reasoning_effort_is_retried_without_it(cfg):
@@ -271,3 +274,63 @@ def test_provider_side_json_failure_is_retried(cfg):
     fake = FakeCompletion(err, response(GOOD))
     (parsed, _), _, sleeps = run(cfg, fake)
     assert parsed.block_id == "E03-B011" and len(fake.calls) == 2 and sleeps == [2]
+
+
+
+# --- CP-2 reviewer fixes (D-034)
+
+def test_two_endpoints_with_the_same_model_name_do_not_share_cache(cfg):
+    run(cfg, FakeCompletion(response(GOOD)))
+    cfg["models"]["proposer"]["api_base"] = "https://kuku.example/v1"
+    fake = FakeCompletion(response(GOOD))
+    (_, _), usage, _ = run(cfg, fake)
+    assert len(fake.calls) == 1 and usage[0]["cache_hit"] is False
+
+
+def test_rejected_param_on_the_last_attempt_raises_the_real_error(cfg):
+    cfg["retries"]["max_attempts"] = 1
+    cfg["models"]["proposer"]["reasoning_effort"] = "low"
+    real = HTTPError(401, "bad key")
+    fake = FakeCompletion(HTTPError(400, "Unsupported parameter: reasoning_effort"), real)
+    with pytest.raises(HTTPError) as caught:
+        run(cfg, fake)
+    assert caught.value is real          # never RuntimeError("unreachable")
+    assert len(fake.calls) == 2          # dropping a param does not use up an attempt
+
+
+def test_param_drops_do_not_use_up_retry_attempts(cfg):
+    cfg["retries"]["max_attempts"] = 2
+    cfg["models"]["proposer"]["reasoning_effort"] = "low"
+    fake = FakeCompletion(HTTPError(400, "reasoning_effort is not supported"),
+                          HTTPError(400, "response_format is not supported"),
+                          HTTPError(429), response(GOOD))
+    (parsed, _), _, _ = run(cfg, fake)
+    assert parsed.block_id == "E03-B011" and len(fake.calls) == 4
+
+
+def test_generation_failure_mentioning_response_format_is_retried_not_dropped(cfg):
+    err = HTTPError(400, '{"error":{"code":"json_validate_failed","message":"Failed to validate JSON against the '
+                         'response_format schema","failed_generation":""}}')
+    fake = FakeCompletion(err, response(GOOD))
+    run(cfg, fake)
+    assert fake.calls[1]["response_format"] == fake.calls[0]["response_format"]
+
+
+def test_rejected_schema_falls_back_to_json_mode_then_to_nothing(cfg, monkeypatch):
+    import litellm
+    monkeypatch.setattr(litellm, "supports_response_schema", lambda model: True)
+    fake = FakeCompletion(HTTPError(400, "response_format json_schema not supported"),
+                          HTTPError(400, "response_format json_object not supported"), response(GOOD))
+    run(cfg, fake)
+    assert fake.calls[0]["response_format"] is Answer
+    assert fake.calls[1]["response_format"] == {"type": "json_object"}
+    assert "response_format" not in fake.calls[2]
+
+
+def test_dropped_param_is_remembered_for_the_rest_of_the_run(cfg):
+    cfg["models"]["proposer"]["reasoning_effort"] = "low"
+    fake = FakeCompletion(HTTPError(400, "Unsupported parameter: reasoning_effort"), response(GOOD))
+    run(cfg, fake)
+    fake2 = FakeCompletion(response(GOOD))
+    run(cfg, fake2, version="other_v")   # a later, uncached call to the same model
+    assert "reasoning_effort" not in fake2.calls[0]

@@ -102,14 +102,23 @@ def retry_after_s(error: Exception) -> float | None:
     return max(hints) + RETRY_MARGIN_S if hints else None
 
 
-def _completion_kwargs(stage_cfg: dict, messages: list[dict], schema: type[BaseModel]) -> dict:
+# Request settings that change the reply, so they go into the cache key (D-034).
+CACHE_SETTINGS = ("api_base", "temperature", "max_tokens", "reasoning_effort")
+# response_format fallbacks when an endpoint rejects one: schema -> plain JSON mode -> nothing.
+JSON_MODE = {"type": "json_object"}
+
+
+def _completion_kwargs(stage_cfg: dict, messages: list[dict], schema: type[BaseModel],
+                       rejected: set[str] | None = None) -> dict:
+    """Request arguments for one call, minus anything this model already rejected in this run."""
+    rejected = rejected or set()
     kwargs = {"model": stage_cfg["model"], "messages": messages,
               "temperature": stage_cfg.get("temperature", 0), "max_tokens": stage_cfg.get("max_tokens", 4000)}
     if stage_cfg.get("api_base"):
         kwargs["api_base"] = stage_cfg["api_base"]
     # Optional thinking budget ("minimal"/"low"/"medium"/"high"). LiteLLM maps this one OpenAI-style
     # name to each provider's own control (Gemini 3: thinkingLevel), so it is config-only (D-027).
-    if stage_cfg.get("reasoning_effort"):
+    if stage_cfg.get("reasoning_effort") and "reasoning_effort" not in rejected:
         kwargs["reasoning_effort"] = stage_cfg["reasoning_effort"]
     key_env = stage_cfg.get("api_key_env")
     if key_env:
@@ -123,40 +132,67 @@ def _completion_kwargs(stage_cfg: dict, messages: list[dict], schema: type[BaseM
         supports_schema = litellm.supports_response_schema(model=stage_cfg["model"])
     except Exception:
         supports_schema = False
-    kwargs["response_format"] = schema if supports_schema else {"type": "json_object"}
+    if supports_schema and "response_format:schema" not in rejected:
+        kwargs["response_format"] = schema
+    elif "response_format:json_object" not in rejected:
+        kwargs["response_format"] = JSON_MODE
     return kwargs
 
 
-def _call_with_retries(completion_fn: Callable, kwargs: dict, retries: dict, sleep: Callable):
-    """Retry 429/5xx (provider wait hint, else exponential backoff). Drop optional params an endpoint rejects."""
+def _rejected_param(error: Exception, kwargs: dict) -> str | None:
+    """Which optional setting a 400 rejects, as a key for the per-run 'rejected' set; None if none."""
+    text = str(error)
+    if "reasoning_effort" in kwargs and "reasoning_effort" in text:
+        return "reasoning_effort"
+    if "response_format" in kwargs and "response_format" in text:
+        return "response_format:json_object" if kwargs["response_format"] == JSON_MODE else "response_format:schema"
+    return None
+
+
+def _retry_wait(error: Exception, status: int | None, attempt: int, retries: dict) -> float | None:
+    """Seconds to wait before the next attempt, or None if this error shouldn't be retried."""
+    generation_failure = status == 400 and any(m in str(error) for m in RETRYABLE_400_MARKERS)
+    if status not in RETRYABLE_STATUS and not generation_failure:
+        return None
+    # Wait as long as the provider says (a 60 s token window outlasts a 2-4-8-16 s backoff);
+    # if it says hours (a daily quota), waiting can't help: don't retry.
+    hint = retry_after_s(error) if status == 429 else None
+    if hint is not None and hint > retries.get("max_wait_s", 120):
+        log.error("provider asks to wait %.0f s (> max_wait_s); giving up", hint)
+        return None
+    return hint if hint is not None else retries.get("backoff_base_s", 2) * 2 ** (attempt - 1)
+
+
+def _call_with_retries(completion_fn: Callable, stage_cfg: dict, messages: list[dict], schema: type[BaseModel],
+                       retries: dict, sleep: Callable, rejected: set[str]):
+    """One API call with retries (D-030, D-034).
+
+    Two separate budgets: `max_attempts` counts real failures (429, 5xx, generation-failure 400s);
+    dropping a setting the endpoint rejects is free, and there are only three to drop, so the loop
+    always ends with either a reply or the provider's real error.
+    Generation failures are checked first: their error text can quote "response_format".
+    """
     max_attempts = retries.get("max_attempts", 5)
-    base = retries.get("backoff_base_s", 2)
-    max_wait = retries.get("max_wait_s", 120)
-    for attempt in range(1, max_attempts + 1):
+    attempt = 0
+    while True:
+        kwargs = _completion_kwargs(stage_cfg, messages, schema, rejected)
         try:
             return completion_fn(**kwargs)
         except Exception as error:
             status = _status(error)
-            # Optional params some endpoints reject: drop the one named in the error and try again.
-            rejected = next((p for p in ("response_format", "reasoning_effort")
-                             if p in kwargs and p in str(error)), None)
-            if status == 400 and rejected:
-                log.warning("%s rejected %s; retrying without it", kwargs["model"], rejected)
-                kwargs = {k: v for k, v in kwargs.items() if k != rejected}
-                continue
             generation_failure = status == 400 and any(m in str(error) for m in RETRYABLE_400_MARKERS)
-            if (status not in RETRYABLE_STATUS and not generation_failure) or attempt == max_attempts:
+            dropped = None if generation_failure or status != 400 else _rejected_param(error, kwargs)
+            if dropped and dropped not in rejected:
+                # Remembered for the rest of the run, so later calls to this model skip it at once.
+                log.warning("%s rejected %s; dropping it for this run", kwargs["model"], dropped)
+                rejected.add(dropped)
+                continue
+            attempt += 1
+            wait = _retry_wait(error, status, attempt, retries)
+            if wait is None or attempt >= max_attempts:
                 raise
-            # Wait as long as the provider says (a 60 s token window outlasts a 2-4-8-16 s backoff);
-            # if it says hours (a daily quota), waiting can't help: fail now with the provider's error.
-            hint = retry_after_s(error) if status == 429 else None
-            if hint is not None and hint > max_wait:
-                log.error("%s: provider asks to wait %.0f s (> max_wait_s %s); giving up", kwargs["model"], hint, max_wait)
-                raise
-            wait = hint if hint is not None else base * 2 ** (attempt - 1)
             log.warning("%s: HTTP %s, retry %d/%d in %.1fs", kwargs["model"], status, attempt, max_attempts - 1, wait)
             sleep(wait)
-    raise RuntimeError("unreachable")
 
 
 def call_llm(stage: str, messages: list[dict], schema: type[BaseModel], cfg: dict, prompt_version: str,
@@ -168,8 +204,8 @@ def call_llm(stage: str, messages: list[dict], schema: type[BaseModel], cfg: dic
     """
     stage_cfg = cfg["models"][stage]
     model = "mock" if cfg.get("mock") else stage_cfg["model"]
-    key = cache_key(model, prompt_version, messages, schema.__name__,
-                    reasoning_effort=None if cfg.get("mock") else stage_cfg.get("reasoning_effort"))
+    settings = None if cfg.get("mock") else {k: stage_cfg.get(k) for k in CACHE_SETTINGS}
+    key = cache_key(model, prompt_version, messages, schema.__name__, settings)
     record = {"stage": stage, "model": model, "prompt_version": prompt_version,
               "reasoning_effort": None if cfg.get("mock") else stage_cfg.get("reasoning_effort"),
               "prompt_tokens": 0, "completion_tokens": 0, "latency_s": 0.0, "cache_hit": False}
@@ -190,12 +226,14 @@ def call_llm(stage: str, messages: list[dict], schema: type[BaseModel], cfg: dic
         import litellm
         completion_fn = litellm.completion
     retries = cfg.get("retries", {})
+    # Settings this model's endpoint rejected earlier in the run (kept in the run's config dict,
+    # not a module global, so each run and each test starts clean).
+    rejected = cfg.setdefault("_rejected_params", {}).setdefault(stage_cfg["model"], set())
     attempt_messages = list(messages)
     repairs_left = retries.get("json_repair_attempts", 1)
     while True:
-        kwargs = _completion_kwargs(stage_cfg, attempt_messages, schema)
         started = time.time()
-        response = _call_with_retries(completion_fn, kwargs, retries, sleep)
+        response = _call_with_retries(completion_fn, stage_cfg, attempt_messages, schema, retries, sleep, rejected)
         raw = response.choices[0].message.content or ""
         prompt_tokens = getattr(response.usage, "prompt_tokens", 0) or 0
         completion_tokens = getattr(response.usage, "completion_tokens", 0) or 0

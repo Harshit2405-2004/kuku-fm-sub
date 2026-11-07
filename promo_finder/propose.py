@@ -7,6 +7,8 @@ sensible order; bad candidates get one repair round, then are dropped and logged
 
 from __future__ import annotations
 
+import logging
+
 from pathlib import Path
 from typing import Callable, Literal
 
@@ -18,6 +20,9 @@ from promo_finder.parse import Episode
 
 BeatType = Literal["slap_or_violence", "humiliation", "betrayal_reveal", "identity_reveal", "threat_ultimatum",
                    "rescue", "proposal_or_romance", "accusation_or_framing", "death_or_danger", "twist", "other"]
+
+
+log = logging.getLogger(__name__)
 
 
 class ProposalCandidate(BaseModel):
@@ -84,20 +89,32 @@ def propose_episode(ep: Episode, cast: dict[str, str] | None, cfg: dict, usage: 
     _save_raw(raw_dir, f"E{ep.ep:02d}.json", raw)
 
     errors = validate_proposals(ep, proposals)
-    if errors:
+    # A wrong top-level episode number alone (key -1) is harmless, since every ID is checked against
+    # this episode, so it isn't worth a repair call under an 8k tokens/minute limit (D-034).
+    repair_failed = None
+    if any(i >= 0 for i in errors):
         problems = "\n".join(f"- candidate {i}: {e}" if i >= 0 else f"- {e}" for i, e in sorted(errors.items()))
         repair = messages + [
             {"role": "assistant", "content": raw},
             {"role": "user", "content": f"Some candidates have problems:\n{problems}\n"
                                         f"Use only block IDs from episode {ep.ep} as listed. Reply with the full corrected JSON."},
         ]
-        proposals, raw = call_llm("proposer", repair, EpisodeProposals, cfg, version, usage, completion_fn=completion_fn)
-        _save_raw(raw_dir, f"E{ep.ep:02d}.repair.json", raw)
-        errors = validate_proposals(ep, proposals)
+        try:
+            repaired, repaired_raw = call_llm("proposer", repair, EpisodeProposals, cfg, version, usage,
+                                              completion_fn=completion_fn)
+        except Exception as error:
+            # Keep the first round's valid candidates rather than losing the whole episode.
+            repair_failed = f"{type(error).__name__}: {error}"[:300]
+            log.warning("E%02d: repair call failed (%s); keeping the valid first-round candidates", ep.ep, repair_failed)
+        else:
+            proposals, raw = repaired, repaired_raw
+            _save_raw(raw_dir, f"E{ep.ep:02d}.repair.json", raw)
+            errors = validate_proposals(ep, proposals)
 
     # After the repair round, drop what is still broken; a wrong episode field alone is harmless
     # because every ID was already checked against this episode.
-    dropped = [{"ep": ep.ep, "index": i, "error": e, "candidate": proposals.candidates[i].model_dump()}
+    suffix = f" (repair failed: {repair_failed})" if repair_failed else ""
+    dropped = [{"ep": ep.ep, "index": i, "error": e + suffix, "candidate": proposals.candidates[i].model_dump()}
                for i, e in sorted(errors.items()) if i >= 0]
     keep = [c for i, c in enumerate(proposals.candidates) if i not in errors]
     return EpisodeProposals(episode=ep.ep, candidates=keep), dropped

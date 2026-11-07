@@ -159,3 +159,33 @@ def test_cli_writes_nothing_on_errors(blank, synth_dir, tmp_path):
                      encoding="utf-8")
     proc = run_cli("--worksheet", str(sheet), "--input", str(synth_dir), "--out", str(out))
     assert proc.returncode == 1 and "not written" in proc.stdout and not out.exists()
+
+
+# --- reviewer's input checks (CP-2): malformed arc points, arc order, Note= case
+
+@pytest.mark.parametrize("line, expected", [
+    ("arc: E01:B002-B006 + E03:B011-B030 hook=E01:B1x2 quality=2 note=", "hook=E01:B1x2"),
+    ("arc: E01:B002-B006 + E03:B011-B030 hook=B004 quality=2 note=", "hook=B004"),
+    ("arc: E01:B002-B006 + E03:B011-B030 cliff=E03:B___ quality=2 note=", "cliff=E03:B___"),
+])
+def test_malformed_arc_point_is_an_error_not_a_silent_default(blank, episodes, line, expected):
+    result = gfw.parse_worksheet(fill(blank, {1: [line]}), episodes)
+    assert result.rows == [] and len(result.errors) == 1 and expected in result.errors[0]
+
+
+def test_arc_point_with_trailing_comma_is_accepted(blank, episodes):
+    line = "arc: E01:B002-B006 + E03:B011-B030 hook=E01:B004, cliff=E03:B030, quality=2 note="
+    row = gfw.parse_worksheet(fill(blank, {1: [line]}), episodes).rows[0]
+    assert (row["hook_block"], row["cliff_block"]) == ("E01-B004", "E03-B030")
+
+
+def test_arc_segments_out_of_order_warn(blank, episodes):
+    result = gfw.parse_worksheet(fill(blank, {1: ["arc: E03:B011-B030 + E01:B002-B006 quality=2 note="]}), episodes)
+    assert result.errors == [] and len(result.rows) == 1
+    assert any("not in episode/time order" in w for w in result.warnings)
+
+
+def test_note_key_is_case_insensitive_and_its_text_is_never_parsed(blank, episodes):
+    line = "- promo: start=B010 hook=B011 cliff=B030 end=B029 quality=3 Note= the hook=B5 moment"
+    row = gfw.parse_worksheet(fill(blank, {3: [line]}), episodes).rows[0]
+    assert row["hook_block"] == "E03-B011" and row["notes"] == "the hook=B5 moment"

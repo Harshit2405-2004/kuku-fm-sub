@@ -1,7 +1,7 @@
 """On-disk cache for LLM responses, so reruns are free and reproducible (hard rule 8, D-011).
 
 Pipeline position: used only by llm.call_llm. The key is a hash of (model, prompt version,
-messages, schema name, reasoning effort if set): change any of them and the call is made fresh.
+messages, schema name, request settings): change any of them and the call is made fresh.
 """
 
 from __future__ import annotations
@@ -12,11 +12,13 @@ from pathlib import Path
 
 
 def cache_key(model: str, prompt_version: str, messages: list[dict], schema_name: str,
-              reasoning_effort: str | None = None) -> str:
+              settings: dict | None = None) -> str:
+    """Hash of everything that changes the reply: model, prompt version, messages, schema, and the
+    request settings (api_base, temperature, max_tokens, reasoning_effort). api_base matters because two
+    OpenAI-compatible endpoints can serve the same model string (D-034)."""
     parts = [model, prompt_version, messages, schema_name]
-    # Only added when set, so cache entries made before this setting existed (D-027) stay valid.
-    if reasoning_effort is not None:
-        parts.append({"reasoning_effort": reasoning_effort})
+    if settings is not None:
+        parts.append(settings)
     payload = json.dumps(parts, sort_keys=True, ensure_ascii=False)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 

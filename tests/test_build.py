@@ -192,3 +192,42 @@ def test_dedupe_keeps_first_listed(ep3):
     kept, merged = dedupe([a, b, c], BCFG["dedupe_iou"])
     assert [k.id for k in kept] == ["P03-1", "P03-3"]
     assert merged[0]["dropped"] == "P03-2" and merged[0]["kept"] == "P03-1"
+
+
+# --- exact boundaries (CP-2 review): 20.0 s and 60.0 s are valid, a hook exactly 3.0 s in is valid
+
+def test_exactly_60s_is_a_single_cut():
+    ep = make_episode([("CAMERA", 0.0, 30.0), ("DIALOGUE", 1.0, 2.0), ("CAMERA", 30.0, 60.0),
+                       ("DIALOGUE", 58.0, 60.0), ("CAMERA", 60.0, 65.0), ("DIALOGUE", 60.5, 62.0)])
+    cand = build_candidate(ep, proposal(7, "E07-B002", "E07-B004"), 1, BCFG)
+    assert cand.type == "single" and cand.total_s == 60.0 and all(cand.checks.values()), cand
+
+
+def test_just_over_60s_is_not_a_single_cut():
+    ep = make_episode([("CAMERA", 0.0, 30.0), ("DIALOGUE", 1.0, 2.0), ("CAMERA", 30.0, 60.1),
+                       ("DIALOGUE", 58.0, 60.1), ("CAMERA", 60.1, 65.0), ("DIALOGUE", 60.5, 62.0)])
+    result = build_candidate(ep, proposal(7, "E07-B002", "E07-B004"), 1, BCFG)
+    assert getattr(result, "type", None) != "single"
+
+
+def test_exactly_20s_is_a_single_cut():
+    ep = make_episode([("CAMERA", 0.0, 20.0), ("DIALOGUE", 1.0, 2.0), ("DIALOGUE", 18.5, 20.0),
+                       ("CAMERA", 20.0, 30.0), ("DIALOGUE", 20.0, 22.0)])
+    cand = build_candidate(ep, proposal(7, "E07-B002", "E07-B003"), 1, BCFG)
+    assert cand.type == "single" and cand.total_s == 20.0 and "extended" not in cand.flags
+    assert all(cand.checks.values()), cand.checks
+
+
+def test_just_under_20s_with_dialogue_right_after_is_too_short():
+    ep = make_episode([("CAMERA", 0.0, 19.9), ("DIALOGUE", 1.0, 2.0), ("DIALOGUE", 18.5, 19.9),
+                       ("CAMERA", 19.9, 30.0), ("DIALOGUE", 19.9, 22.0)])
+    result = build_candidate(ep, proposal(7, "E07-B002", "E07-B003"), 1, BCFG)
+    assert getattr(result, "reason", None) == "too_short"
+
+
+def test_hook_exactly_3s_after_clip_start_passes():
+    ep = make_episode([("CAMERA", 0.0, 40.0), ("DIALOGUE", 3.0, 4.0), ("DIALOGUE", 36.0, 40.0),
+                       ("CAMERA", 40.0, 45.0), ("DIALOGUE", 40.5, 42.0)])
+    cand = build_candidate(ep, proposal(7, "E07-B002", "E07-B003"), 1, BCFG)
+    assert cand.segments[0].start == 0.0 and cand.hook_offset_s == 3.0
+    assert cand.checks["hook_within_3s"] is True

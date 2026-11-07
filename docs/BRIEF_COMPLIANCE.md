@@ -17,6 +17,10 @@ Status: ☐ not started · ◐ in progress · ☑ done (with evidence path)
 
 ## B. Problem 1 requirements (brief page 2)
 
+**Verbatim source: the brief's promo definition** (supplied by Harshit at CP-2, 2026-11-07; quoted word for word in `promo_finder/prompts/proposer.md` (proposer_v3) and `promo_finder/prompts/judge.md`):
+
+> A promo is a 20 to 60-second clip taken from the show itself and posted on Instagram, TikTok or YouTube to pull new viewers in. It's usually one continuous stretch, but it can also join a few moments, from one episode or across several. A good promo: opens on a hook: something in the first 3 seconds that makes a scrolling viewer stop, like a slap, a reveal or a shocking line; ends on a cliffhanger: it cuts at an unresolved moment, so the viewer needs to know what happens next; makes sense on its own to someone who has never seen the show.
+
 | # | Requirement | How we satisfy it | Evidence | Status |
 |---|---|---|---|---|
 | B1 | A promo is a 20–60 s clip from the show | Code enforces 20 ≤ total duration ≤ 60 s. 100% of outputs are validated. | build.py validity checks; eval report "validity" | ☐ |

@@ -36,8 +36,8 @@ A running log of every task Claude Code executes, in order. A new session must b
 |---|---|---|---|
 | 0 Setup | ☑ | T0-fix | venv 3.13, git init, kit + doc fixes committed (fc4c4b7). Deadline set at CP-1 leftovers. |
 | 1 Parser | ☑ | CP-1 leftovers | 50/50 eps; 0 unassigned lines; aliases final (0 VERIFY, per-episode override D-026); 51 canonical speakers |
-| 2 Gold | ◐ labels approved | T2.2 | Harshit: "Gold labels done" (provenance D-033); **gold/gold_labels.csv not generated yet**: Harshit to run scripts/gold_from_worksheet.py |
-| 3 LLM/propose/build | ◐ at CP-2 | CP-2 | 181 tests; reviewer PASS WITH FIXES (0 blocking, 11 should-fix); smoke 4 valid clips / 6 proposals; waiting for Harshit's go |
+| 2 Gold | ☑ | T2.2 | 15 rows (12 promo, 1 arc, 2 NONE), 0 errors/warnings; provenance D-033; CSV git-ignored |
+| 3 LLM/propose/build | ☑ | CP-2 decisions | 200 tests; 4 reviewer fixes (D-034); proposer_v3 (D-035); decisions tidied |
 | 4 Arcs/judge/rank/run A | ☐ | | |
 | 5 Eval / run B | ☐ | | |
 | 6 App/deploy | ☐ | | |
@@ -396,3 +396,28 @@ A running log of every task Claude Code executes, in order. A new session must b
   10. v1→v2 prompt bump without a before/after (v1 never ran on real episodes).
   11. build tests: add boundary tests at exactly 60.0 s, 20.0 s and a 3.0 s hook (the reviewer's probe says behaviour is already correct).
   Nits: the "try again in" parser handles 2 units only; Retry-After is ignored on 503; a generation-failure retry reuses the same max_tokens; the cache key uses the schema name, not its fields; the TECH_SPEC §5 example is stale (low/Gemini); the NONE regex matches "none of these…"; `_shots` re-sorts on every call.
+
+### CP-2 decisions applied: gold CSV, reviewer fixes, proposer_v3, decisions tidy-up  ·  2026-11-07  ·  status: done
+**Goal:** Apply Harshit's CP-2 decisions before Phase 4.
+**What I did:**
+- **Gold:** ran `scripts/gold_from_worksheet.py` on Harshit's worksheet (contents never printed or read back; only the summary lines). Added the reviewer's 3 converter checks (TDD), then re-ran with --force: the same per-episode counts.
+- **Reviewer fixes (D-034, TDD):** retry loop (no "unreachable"; drops don't use up attempts); generation-failure 400s checked first; rejected settings remembered per model for the run; schema → json_object → none fallback; repair failure keeps valid candidates; no repair for a wrong episode field alone; cache key includes api_base, temperature, max_tokens and reasoning_effort. Plus 5 boundary tests (60.0 / 60.1 / 20.0 / 19.9 s, hook at 3.0 s).
+- **Brief definition** stored verbatim in docs/BRIEF_COMPLIANCE.md §B; D-025 updated.
+- **proposer_v2 → proposer_v3 (why):** Harshit's CP-2 review of the v2 clips. v3 quotes the brief's definition verbatim and adds 7 hard rules: start on the strike/reveal, conflict hooks only, an open-question cliff (a vow is not a cliff), hook→cliff ≥ 20 s, quiet → zero, honest beat_type, variety (D-035).
+- **Decisions:** D-021 to D-028, D-030, D-031 and D-032 (condition met) accepted; D-033 kept public; D-007 superseded; supersede notes on D-006, D-012, D-022 and D-028.
+- **ai_log #8** (hook in the wrong place, caught by Harshit's review; details private) and **#9** (a heredoc wrote a backspace into a regex; caught by tests).
+**Files changed:** promo_finder/{llm,cache,propose}.py, promo_finder/prompts/proposer.md (v3), scripts/gold_from_worksheet.py, tests/{test_llm,test_propose,test_build,test_gold_worksheet}.py, docs/BRIEF_COMPLIANCE.md, decisions.md, ai_log.md, report.md. Private: gold/gold_labels.csv (generated), private/{smoke_T3.5.md, ai_log_details.md}.
+**Commands & results:**
+    $ python scripts/gold_from_worksheet.py --input "input/<pack>" → rows 15 (promos 12, arcs 1, none 2) · warnings 0 · errors 0 · wrote gold/gold_labels.csv
+      per episode: E01 2+1 arc · E03 2 · E08 none · E12 1 · E17 none · E18 2 · E27 2 · E31 1 · E42 1 · E45 1; 20–60 s check: 0 outside
+    $ git check-ignore -v gold/gold_labels.csv → .gitignore:7:gold/*.csv
+    $ pytest -q tests/test_gold_worksheet.py → (RED) 6 failed, 18 passed → 24 passed (after removing 2 stray backspace characters, ai_log #9)
+    $ pytest -q tests/test_llm.py tests/test_propose.py → (RED) 8 failed, 42 passed → GREEN
+    $ pytest -q → 200 passed in 9.71s
+    smoke v3 (gpt-oss, episodes 6, 24, 40): run smoke_v3_gptoss_20261107_204635 · 3 calls · (prompt, completion) = (5,646, 476), (4,826, 2,569), (4,126, 1,677) · 107.5 s wall
+      v2 → v3: proposals 6 → 2 · valid 4 → 2 · too_short 2 → 0 · quiet episode 2 → 0 proposals · hook offsets v3: 1.7 s, 0.3 s (table in private/smoke_T3.5.md)
+    D-032 condition: gemini-3.5-flash-lite 1-token call at 2026-11-07 20:48 IST → OK → run B uses flash-lite
+**Decisions:** D-034, D-035 (Proposed); statuses updated as above
+**AI mistakes caught:** ai_log #8, #9
+**Open issues / risks:** v3 yields about 0.7 clips per episode (run A may give about 35 candidates). Rule 1 can make a clip open on its best line and end weaker (D-035). For later (Harshit, CP-2 D): "slow middle → jump-cut" rule; one v2 clip on a non-gold episode is the example (keep about 26–33 s + 65–78 s). Not built now.
+**Next:** Phase 4: judge → ranker → outputs → run A, then arcs (30-min cap)

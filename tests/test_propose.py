@@ -54,7 +54,7 @@ class Fake:
 
 def test_prompt_has_version_and_no_unfilled_placeholders(episodes):
     version, _ = load_prompt("proposer")
-    assert version == "proposer_v2"
+    assert version == "proposer_v3"
     messages = build_messages(episodes[3], None)
     assert [m["role"] for m in messages] == ["system", "user"]
     assert "[E03-B011 00:13.0–00:14.8]" in messages[1]["content"]
@@ -153,3 +153,29 @@ def test_propose_episode_reads_camera_limit_from_config(episodes, cfg):
         propose_episode(episodes[3], None, cfg, [], completion_fn=fake)
     cams = [l.split(" CAM: ", 1)[1] for l in sent[0][1]["content"].splitlines() if " CAM: " in l]
     assert cams and all(len(c) <= 20 for c in cams)
+
+
+
+class FailingFake(Fake):
+    """Returns the queued replies, then raises (a repair call that fails outright)."""
+
+    def __call__(self, **kwargs):
+        self.calls.append(kwargs)
+        if not self.replies:
+            raise RuntimeError("provider down")
+        return self.replies.pop(0)
+
+
+def test_failed_repair_call_keeps_the_valid_candidates(episodes, cfg, tmp_path):
+    good, bad = cand(), cand(hook="E03-B999")
+    fake = FailingFake(reply({"episode": 3, "candidates": [good, bad]}))
+    proposals, dropped = propose_episode(episodes[3], None, cfg, [], raw_dir=tmp_path, completion_fn=fake)
+    assert [c.hook_block for c in proposals.candidates] == ["E03-B011"]
+    assert len(dropped) == 1 and "repair failed" in dropped[0]["error"]
+    assert len(fake.calls) == 2
+
+
+def test_wrong_episode_field_alone_does_not_trigger_a_repair(episodes, cfg, tmp_path):
+    fake = Fake(reply({"episode": 9, "candidates": [cand()]}))
+    proposals, dropped = propose_episode(episodes[3], None, cfg, [], raw_dir=tmp_path, completion_fn=fake)
+    assert len(fake.calls) == 1 and len(proposals.candidates) == 1 and dropped == []

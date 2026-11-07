@@ -31,7 +31,8 @@ NONE = re.compile(r"^\s*-?\s*none\b\s*(?:note=)?(.*)$", re.IGNORECASE)
 FIELD = re.compile(r"(start|hook|cliff|end|quality)\s*=\s*(\S+)", re.IGNORECASE)
 NOTE = re.compile(r"\bnote\s*=\s*(.*)$", re.IGNORECASE)
 ARC_SEGMENT = re.compile(r"^E(\d+)\s*:\s*(\S+?)\s*-\s*(\S+)$", re.IGNORECASE)
-ARC_POINT = re.compile(r"(hook|cliff)\s*=\s*E(\d+)\s*:\s*(\S+)", re.IGNORECASE)
+ARC_POINT = re.compile(r"\b(hook|cliff)\s*=\s*(\S+)", re.IGNORECASE)
+NOTE_SPLIT = re.compile(r"\bnote\s*=", re.IGNORECASE)
 
 
 @dataclass
@@ -48,6 +49,11 @@ def full_id(ep: int, text: str) -> str | None:
     if not m:
         return None
     return f"E{int(m.group(1) or ep):02d}-B{int(m.group(2)):03d}"
+
+
+def _before_note(text: str) -> str:
+    """The part of a line before note= (any case), so words inside a note are never read as fields."""
+    return NOTE_SPLIT.split(text, maxsplit=1)[0]
 
 
 def _note(text: str) -> str:
@@ -81,7 +87,7 @@ def _count(result: Result, ep: int, kind: str) -> None:
 
 
 def _parse_promo(ep: int, text: str, where: str, blocks: dict[str, Block], result: Result) -> dict | None:
-    fields = {k.lower(): v for k, v in FIELD.findall(text.split("note=")[0])}
+    fields = {k.lower(): v for k, v in FIELD.findall(_before_note(text))}
     ids = {k: fields.get(k, "") for k in ("start", "hook", "cliff", "end")}
     if all("_" in v or not v for v in ids.values()):
         return None  # untouched template line
@@ -135,8 +141,20 @@ def _parse_arc(text: str, where: str, blocks: dict[str, Block], result: Result) 
             return None
         segments.append(_segment(blocks[a], blocks[b]))
         seg_blocks.append((blocks[a], blocks[b]))
+    # Episode then time order is the normal arc shape (TECH_SPEC 4.4); anything else is allowed but flagged.
+    if any((b[0], b[1]) <= (a[0], a[1]) for a, b in zip(segments, segments[1:])):
+        result.warnings.append(f"{where}: arc segments are not in episode/time order")
     # Optional hook=E01:B012 / cliff=E42:B019; default to the first block and the last block.
-    points = {k.lower(): full_id(int(ep), b) for k, ep, b in ARC_POINT.findall(text)}
+    # A key that is present but unreadable is an error, never a silent fall-back to the default.
+    points = {}
+    for key, raw in ARC_POINT.findall(_before_note(text)):
+        raw = raw.rstrip(",;.")
+        m = re.fullmatch(r"E(\d+)\s*:\s*(\S+)", raw, re.IGNORECASE)
+        bid = full_id(int(m.group(1)), m.group(2)) if m else None
+        if bid is None:
+            result.errors.append(f"{where}: arc {key.lower()}={raw} is not a block like E01:B012")
+            return None
+        points[key.lower()] = bid
     hook = points.get("hook") or seg_blocks[0][0].id
     cliff = points.get("cliff") or seg_blocks[-1][1].id
     for name, bid in (("hook", hook), ("cliff", cliff)):
@@ -145,7 +163,7 @@ def _parse_arc(text: str, where: str, blocks: dict[str, Block], result: Result) 
         if not inside:
             result.errors.append(f"{where}: arc {name}={bid} is not inside any segment")
             return None
-    quality = _quality(dict((k.lower(), v) for k, v in FIELD.findall(text.split("note=")[0])).get("quality"),
+    quality = _quality(dict((k.lower(), v) for k, v in FIELD.findall(_before_note(text))).get("quality"),
                        where, result)
     if quality is None:
         return None

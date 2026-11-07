@@ -62,6 +62,7 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 
 ## D-006: The judge uses a different model family from the proposer
 - Date: 2026-11-07 · Owner: Harshit · Status: Accepted
+- **Note (CP-2, 2026-11-07):** Superseded in part by D-029 (models): the proposer is now gpt-oss-120b and the judge qwen3.8-27b, still different families.
 - Context: LLM judges tend to favour outputs that look like their own (self-preference bias).
 - Decision: Default to a Gemini proposer and a Groq-hosted judge from a different family. Measure judge–human agreement (EVAL §2).
 - Alternatives: Same model for both (simpler, but biased); no judge, rank by proposer order (no calibrated scores).
@@ -69,7 +70,8 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Reversible?: Yes (config).
 
 ## D-007: Harshit hand-labels the gold set before seeing any model output
-- Date: 2026-11-07 · Owner: Harshit · Status: Accepted
+- Date: 2026-11-07 · Owner: Harshit · Status: Superseded by D-033
+- **Note (CP-2, 2026-11-07):** Superseded by D-033: the gold picks were drafted by a non-pipeline Claude session and reviewed and approved by Harshit, not hand-labelled from scratch.
 - Context: Without ground truth, "quality checking" is only opinion. Labelling after seeing the outputs anchors you to them.
 - Decision: 12–20 gold promos over about 10 episodes, labelled before the smoke test output is read, with 3 held-out episodes.
 - Alternatives: LLM-generated gold (circular). No gold (weak quality lens).
@@ -110,6 +112,7 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 
 ## D-012: Simple, readable code; Streamlit app plus CLI; Python 3.11
 - Date: 2026-11-07 · Owner: Harshit · Status: Accepted
+- **Note (CP-2, 2026-11-07):** Python version: see D-013 (the venv runs 3.13).
 - Context: Harshit has to explain every line, and the brief says polish earns nothing.
 - Decision: Plain functions and a minimal dependency list (TECH_SPEC §9). Streamlit for the hosted demo.
 - Alternatives: FastAPI with a React front end (more polish, no extra credit). No-code (harder to rerun and swap models).
@@ -183,7 +186,7 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Reversible?: Yes.
 
 ## D-021: Small parser and display choices made during the CP-1 fixes
-- Date: 2026-11-07 · Owner: Claude · Status: Proposed
+- Date: 2026-11-07 · Owner: Claude · Status: Accepted (Harshit, CP-2, 2026-11-07)
 - Context: The reviewer's nits left the exact choices to us.
 - Decision: Accept `**LABEL**:` as a block header. Normalise flag spellings (O.S / OS / Off-screen → O.S.; V.O / VO → V.O.; CONT'D with a curly apostrophe → CONT'D). Map label `SFX` to SOUND_FX like `SOUND FX`. Strip quotes per line in multi-line dialogue. `format_tc` rounds half up (0.25 → 0.3) instead of Python's half-to-even; this amends D-019. Add `pytest.ini` so tests run from any directory.
 - Alternatives: Leave the variants as emotions or speakers (worse prompts, missed flags); keep banker's rounding (hard to explain, and timecodes reach editors).
@@ -191,7 +194,8 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Reversible?: Yes.
 
 ## D-022: Default free models: Gemini 3.5 Flash (proposer, arc) and gpt-oss-120b on Groq (judge)
-- Date: 2026-11-07 · Owner: Claude · Status: Proposed
+- Date: 2026-11-07 · Owner: Claude · Status: Accepted (Harshit, CP-2, 2026-11-07)
+- **Note (CP-2, 2026-11-07):** Superseded in part by D-029 (models): all stages moved to Groq because of Gemini's 20 requests/day free tier. Gemini 3.5 Flash-Lite is run B's proposer (D-032).
 - Context: T3.1 asks for current free-tier IDs, verified live. Web sources disagreed and named models we couldn't confirm, so we listed models from each provider's own API with our keys, then made a 1-token LiteLLM call to each candidate.
 - Decision: proposer and arc = `gemini/gemini-3.5-flash` (OK in 2.7 s, LiteLLM schema support = True). Judge = `groq/openai/gpt-oss-120b` (OK in 0.4 s, schema = True; a different family from Gemini, per D-006; Groq lists strict JSON-schema decoding for it). Also verified as fallbacks: `gemini/gemini-3.5-flash-lite` (4.2 s), `groq/qwen/qwen3.8-27b` (0.1 s).
 - Alternatives: `gemini/gemini-3.8-flash` (newest; the call succeeded but took 157.9 s for 1 token, and one blog reports only ~20 requests/day on the free tier, which can't cover 50 episodes). Free-tier quotas are not published by API; Harshit should confirm them in AI Studio / the Groq console.
@@ -199,7 +203,7 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Reversible?: Yes (config.yaml or --proposer-model / --judge-model).
 
 ## D-023: LLM-layer details where TECH_SPEC §5 is silent
-- Date: 2026-11-07 · Owner: Claude · Status: Proposed
+- Date: 2026-11-07 · Owner: Claude · Status: Accepted (Harshit, CP-2, 2026-11-07)
 - Context: §5 fixes LiteLLM, per-stage config, retries and the cache, but not how flags combine, what gets cached, or how odd endpoints are handled.
 - Decision: (1) `--api-base` / `--api-key-env` apply to the stages whose model was overridden on the CLI, or to all stages if no model flag was given, so "upgrade only the judge" keeps the free proposer. (2) `call_llm` returns (validated object, raw text) so stages can save raw replies unedited (FR8). (3) Only the final valid reply is cached; every attempt is recorded in usage. (4) Retry on HTTP 408/429/5xx with backoff 2, 4, 8… s; other errors fail fast. (5) If an endpoint rejects `response_format`, retry once without it and validate JSON extracted from the text (fences and prose stripped). (6) Schema-constrained output is requested when `litellm.supports_response_schema` says yes, JSON mode otherwise. (7) A missing key env var is a clear error naming the variable; key values are never stored.
 - Alternatives: tenacity for retries (optional per §9; a 10-line loop is easier to explain); caching every attempt (would make a bad reply "stick").
@@ -207,7 +211,7 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Reversible?: Yes.
 
 ## D-024: Cut-builder choices where TECH_SPEC §4.3 is silent
-- Date: 2026-11-07 · Owner: Harshit (tie rule) / Claude (rest) · Status: Proposed (tie rule approved by Harshit at kickoff)
+- Date: 2026-11-07 · Owner: Harshit (tie rule) / Claude (rest) · Status: Accepted (Harshit, CP-2, 2026-11-07)
 - Context: §4.3 leaves ties, a few edge cases and the role of the proposed start/end blocks open.
 - Decision: (1) Snap-start tie (two shots equally close to hook − 1 s): the earlier shot wins (more lead-in). (2) Shots are searched by time, not file order (real scripts list a line before the shot it sits under). (3) The cut is computed from the hook and cliff blocks only; the proposed start_block/end_block are stored for reference. Otherwise the 3 s hook rule and the no-leak end rule could be broken by the model. (4) A jump-cut whose only valid cut leaves < 20 s is rejected as `too_short`. (5) "Shot holding the cliff" = the camera shot with start < cliff end ≤ shot end; a cliff ending exactly on a shot boundary ends there. (6) A float tolerance of 1e-6 s is used at every boundary (exactly 3.0 s or 60.0 s passes).
 - Alternatives: Honour the model's start/end blocks (gives up code control of the two hardest constraints, against D-002's spirit); keep under-20 s jump-cuts with dur_ok=false (an invalid clip in the list).
@@ -215,15 +219,16 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Reversible?: Yes.
 
 ## D-025: Proposer prompt v1 and stage details
-- Date: 2026-11-07 · Owner: Claude · Status: Proposed
+- Date: 2026-11-07 · Owner: Claude · Status: Accepted (Harshit, CP-2, 2026-11-07)
 - Context: TECH_SPEC §4.2/§6 want the brief's promo definition verbatim, 3 hook patterns from gold/ad_observations.md, and ≤ 2 synthetic examples. ad_observations.md may not be read until Harshit says "Gold labels done", and the brief's exact wording isn't stored in the repo.
 - Decision: (1) v1 quotes the brief fragments recorded in docs/BRIEF_COMPLIANCE.md §B (the closest verbatim text we have). (2) v1's 3 opening patterns come from public category research (docs/RESEARCH.md §3); proposer_v2 will swap in Harshit's observed patterns after the gold labels. (3) One worked example (synthetic ep 3, from PROCESS_GUIDE). (4) `reasoning` is the first field, so the model explains before choosing IDs (§4.5 uses the same idea). (5) The order check is start ≤ hook ≤ cliff by start time and end_block ending at or after the cliff, because end_block may be the shot the cliff sits in, which starts before the cliff line. (6) One repair round for bad IDs or order, then drop and log. (7) Mock proposer: the first line with "?"/"!" (else any line) that has a later line 15–45 s after it to cut on.
 - Alternatives: Wait for ad_observations before writing any prompt (blocks Phase 3); put the example in a separate file (harder to see what the model sees).
 - Consequences: Live check on the synthetic show: 4 candidates over 3 episodes, 0 invalid IDs, all cuts valid. Synthetic ep 3 is contaminated as a test (the model returned the prompt's own example), so it can't be used to judge prompt quality. Paste Harshit's exact brief wording into the prompt if available (v2).
 - Reversible?: Yes (prompt versioned; cache keys include the version).
+- **Update 2026-11-07 (CP-2):** point (1) is superseded. Harshit supplied the brief's exact promo definition; it is stored verbatim in docs/BRIEF_COMPLIANCE.md §B and quoted word for word in proposer_v3 and judge.md (D-035).
 
 ## D-026: Per-episode speaker-alias override
-- Date: 2026-11-07 · Owner: Harshit (choice of option b) / Claude (format) · Status: Proposed (Harshit chose option b; the key format is Claude's, so it needs his sign-off)
+- Date: 2026-11-07 · Owner: Harshit (choice of option b) / Claude (format) · Status: Accepted (Harshit, CP-2, 2026-11-07)
 - Context: The CP-1 alias evidence sheet showed that one descriptive speaker label means two different characters: one character in a single early episode (2 blocks) and another in 9 later episodes (51 blocks). A global label → name map can't express that. Details are in private/ai_log_details.md.
 - Decision: An alias key `"E<n>:LABEL"` (e.g. `"E02:LABEL"`) overrides `LABEL` for episode n only. `load_aliases` normalises it to `E02:LABEL` (upper case, zero-padded); `canonical_speaker(raw, aliases, ep)` checks the episode key first, then the global key, then falls back to title case. The parser passes the episode number. `leak_check.py` strips the `E<n>:` prefix so the bare label is still scanned for.
 - Alternatives: (a) keep the global mapping and accept 2 mislabelled blocks; they only feed context text, but the ranker or judge would attribute one character's lines to the main villain. (c) Per-block overrides (more precise, but nothing needs that today).
@@ -231,7 +236,7 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Reversible?: Yes (delete the override line).
 
 ## D-027: Proposer thinking budget set via config (`reasoning_effort: low`)
-- Date: 2026-11-07 · Owner: Claude · Status: Proposed
+- Date: 2026-11-07 · Owner: Claude · Status: Accepted (Harshit, CP-2, 2026-11-07); as revised: provider-default reasoning (`reasoning_effort: null`), not `low`
 - Context: Gemini 3.5 Flash spends about 2.3k hidden reasoning tokens per synthetic episode (T3.4). Over 50 real (longer) episodes, plus repair calls and run B, that eats the free daily quota and adds latency. Harshit asked whether the budget can be set from config.yaml, so a model swap still needs no code change.
 - Decision: Add an optional per-stage key `reasoning_effort` (minimal | low | medium | high | null). `llm.py` passes it to LiteLLM only when set. LiteLLM 1.108.2 maps this one OpenAI-style name to each provider's own control (Gemini 3 → `thinkingLevel`; OpenAI-compatible endpoints and Groq's gpt-oss take it as is). The value is part of the cache key, but only when set, so existing cache entries stay valid. If an endpoint answers 400 naming `reasoning_effort`, the call is retried once without it, like `response_format` (D-023). Set the **proposer to `low`**; arc and judge stay at the provider default until they are tested.
 - Evidence (synthetic show only, run `outputs/effort_synth_20261107_184345/`, proposer_v1, same prompts):
@@ -250,7 +255,8 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - **Resolved 2026-11-07 (Harshit):** `reasoning_effort: null` (provider default) for Gemini and for gpt-oss, unless the re-smoke shows a problem. gpt-oss re-smoke at the default: 6 proposals over 3 episodes, completion 1,708–2,994 tokens per call (no problem found, see D-030 for max_tokens).
 
 ## D-028: Gold-label tooling: neutral worksheet → CSV converter
-- Date: 2026-11-07 · Owner: Harshit (workflow) / Claude (details) · Status: Proposed
+- Date: 2026-11-07 · Owner: Harshit (workflow) / Claude (details) · Status: Accepted (Harshit, CP-2, 2026-11-07)
+- **Note (CP-2, 2026-11-07):** Superseded in practice by D-033 (gold drafted by a non-pipeline Claude, human-approved). The tooling is unchanged and was used to write the CSV; CP-2 added stricter input checks (D-034).
 - Context: Harshit picks the gold promos by hand (EVAL_PLAN §1). Typing times by hand is slow and error-prone, and hard rule 5 says Claude never writes or edits the gold labels.
 - Decision: (1) `scripts/make_gold_worksheet.py` writes every block of the chosen episodes in file order, with no highlighting, ranking or suggestions, plus empty answer slots, into `private/` (git-ignored). (2) `scripts/gold_from_worksheet.py` is run **by Harshit**. It converts block IDs to times from the parsed pack and writes `gold/gold_labels.csv` in the EVAL_PLAN format; the CSV is still Harshit's, since the script only transcribes his picks. (3) Hard errors block the write: unknown IDs, an ID from the wrong episode, a quality outside 1–3, or bad order (by time: start ≤ hook ≤ cliff by start time and cliff end ≤ end-block end, the same rule as D-025, because the end block can be the shot holding the cliff). A length outside 20–60 s is only a warning, because the human label is ground truth. (4) Arc lines take optional `hook=E01:B012 cliff=E42:B019`; by default hook = the first segment's first block and cliff = the last segment's last block. An arc counts under its first segment's episode. (5) The script refuses to overwrite an existing CSV (or worksheet) without `--force`. (6) Held-out episodes are in `gold/holdout.txt` (git-ignored) and are never used for prompt iteration.
 - Alternatives: label straight into the CSV with times (slow, typo-prone); have Claude pre-select candidate moments (anchoring; it would invalidate gold recall).
@@ -266,7 +272,7 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Applied 2026-11-07: config.yaml stages = proposer/arc `groq/openai/gpt-oss-120b`, judge `groq/qwen/qwen3.8-27b`, concurrency 1. **For the doc:** explain that a paid tier (or Kuku's own API) removes the 20/day and 8k/min caps; the pipeline needs only a config change (D-005).
 
 ## D-030: Rate limits on Groq: honour the provider's wait hint, size max_tokens from measured usage
-- Date: 2026-11-07 · Owner: Claude · Status: Proposed
+- Date: 2026-11-07 · Owner: Claude · Status: Accepted (Harshit, CP-2, 2026-11-07)
 - Context: Groq's free tier is 8,000 tokens/minute per model. Our fixed backoff (2+4+8+16 s = 30 s) can't outlast a 60 s token window, and max_tokens had to be sized without knowing how Groq counts it.
 - Measured (live, 2026-11-07, gpt-oss-120b): (1) **max_tokens is not charged up front.** These all returned 200 with an idle window: tiny prompt + max_tokens 9,000; a ~4,074-token prompt + 4,500; and a real episode prompt (5,031 tokens) + 4,400. A "Request too large … TPM" 429 appeared only when earlier calls were still inside the 1-minute window, so actual prompt + completion tokens are what count. (2) **Reasoning can eat the whole cap:** one episode used 2,994 of max_tokens 3,000 (twice, in separate runs). On another attempt with that cap, Groq returned **HTTP 400 `json_validate_failed`** with an empty `failed_generation`: the model ran out of tokens before writing JSON. (3) Groq isn't deterministic at temperature 0: the same request gave 1,619 and then 2,275 completion tokens (relevant to EVAL check 5, self-stability).
 - Decision: (a) On a 429, wait for the longest provider hint: `Retry-After`, `x-ratelimit-reset-tokens`, `x-ratelimit-reset-requests` (only when 0 requests remain), or the text "try again in Xs" / Gemini's `retryDelay`, plus 0.5 s. Use the exponential backoff only when there's no hint. If the hint exceeds `retries.max_wait_s` (120 s; a daily quota), fail at once with the provider's error. (b) Retry Groq's generation-failure 400s (`json_validate_failed`, "Failed to generate/validate JSON") like a 5xx. (c) max_tokens: proposer and arc 4,000, judge 3,000. Since max_tokens isn't reserved, a cap above the observed maximum (2,994) costs nothing in TPM and avoids empty replies. The per-minute budget is governed by actual totals (largest smoke call 5,378 + 2,994 = 8,372, which went through on an idle window). (d) concurrency 1 per model. 9 new tests.
@@ -275,7 +281,7 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Reversible?: Yes.
 
 ## D-031: Proposer reads CAMERA text cut to 70 characters (config `proposer_input.camera_max_chars`)
-- Date: 2026-11-07 · Owner: Harshit (requested) / Claude (measurement) · Status: Proposed
+- Date: 2026-11-07 · Owner: Harshit (requested) / Claude (measurement) · Status: Accepted (Harshit, CP-2, 2026-11-07)
 - Context: Fit the proposer input under Groq's 8k tokens/minute with room for reasoning.
 - Decision: `compact_episode(..., camera_max_chars)` shortens CAMERA text only, ending in "…"; dialogue, action and SFX lines are never cut. It's on by default for the proposer (70). The judge always sees full lines (TECH_SPEC §4.5). The worksheet script now uses the same `shorten()` helper.
 - Measured (LiteLLM token counter for gpt-oss, proposer_v2 messages): 80% of the pack's 1,754 CAMERA lines are over 70 chars (median 93). Ep 6: 5,179 → 4,981 (−4%); ep 24: 4,327 → 4,159 (−4%); ep 40: 3,725 → 3,474 (−7%). Whole pack: 220,040 → 210,675 (−4%); largest episode 6,013 → 5,770. Tighter limits barely help: 50 chars → 204,499; 40 → 201,077. Groq's own prompt count runs about 8–11% above this counter (chat-format overhead): 5,378 / 4,558 / 3,858 for the same three episodes.
@@ -284,7 +290,7 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Reversible?: Yes (config).
 
 ## D-032: Run B = proposer `gemini/gemini-3.5-flash-lite` on the 10 gold episodes, same judge
-- Date: 2026-11-07 · Owner: Claude (proposal; Harshit asked for a Groq Llama) · Status: Proposed. **Needs Harshit's OK.**
+- Date: 2026-11-07 · Owner: Claude (proposal; Harshit asked for a Groq Llama) · Status: Accepted (Harshit, CP-2, 2026-11-07), with a condition: a 1-token call to gemini-3.5-flash-lite must succeed first. Checked 2026-11-07 20:48 IST: OK, so run B uses flash-lite
 - Context: Harshit asked for run B with a different Groq model family (e.g. Llama) as proposer, on the 10 gold episodes only, with the same judge, running tonight after or in parallel with run A. Groq's live model list (2026-11-07) has **no Llama chat models**, only `llama-prompt-guard-2` classifiers. The chat models are gpt-oss-120b/20b (same family as run A), qwen3.8-27b (the judge's family, so self-preference bias), and allam-2-7b (small, Arabic-focused).
 - Decision (proposed): run B's proposer = `gemini/gemini-3.5-flash-lite`. It's a different family from both gpt-oss and the qwen judge, was verified in D-022, and answered a 1-token call tonight, on its own per-model quota. 10 episodes ≈ 10–12 requests, which fits even a 20/day limit (its real limit is unknown until it 429s). Reasoning default (D-027). Judge = qwen3.8-27b, same as run A. It can run in parallel with run A's proposer (different provider), but its judge calls queue behind run A's because they share qwen's 8k TPM. **Optional extra:** `gemini/gemini-3.5-flash` on the same 10 episodes after its quota resets (~13:30 IST, 2026-11-08), if time allows.
 - Alternatives: proposer qwen3.8-27b (same family as the judge, which biases the comparison); gpt-oss-20b (same family, so it's a size swap, not a family swap); swap the judge too (confounds the comparison).
@@ -292,10 +298,32 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Reversible?: Yes (CLI `--proposer-model`).
 
 ## D-033: Gold-set provenance (exact wording to reuse)
-- Date: 2026-11-07 · Owner: Harshit · Status: **Accepted** (Harshit, 2026-11-07)
+- Date: 2026-11-07 · Owner: Harshit · Status: Accepted (Harshit, 2026-11-07; kept public at CP-2)
 - Context: EVAL_PLAN §1 assumed hand labels. Harshit reports how the gold set was actually made, and asked that this exact wording be used wherever the gold set is described (eval report, doc draft).
 - **Wording to use verbatim** (Harshit's words): "Gold episodes: 1, 3, 8, 12, 17, 18, 27, 31, 42, 45. Held-out: 3, 27, 45. Provenance: picks were drafted by Claude in a separate claude.ai session (not a pipeline model), from a full read of these 10 episodes, then reviewed and approved by me; I chose to keep E31 at quality 3 with a brand-safety note, and E08/E17 as none."
   (In third-person documents, "me" = Harshit.)
 - Decision: The gold set is LLM-drafted and human-approved. Report every gold-based metric (recall, recall@20, weighted recall, quiet-episode false positives) together with this provenance statement, never as "human labels" alone.
 - Consequences (Claude's note, for honest reporting, not a reversal): gold recall measures agreement with a Claude-drafted, Harshit-approved shortlist, not with an independent human editor. Claude is not in the pipeline (proposer gpt-oss, judge qwen, run B Gemini; D-029, D-032), so there's no same-model leakage. Still, two LLMs can share blind spots, so recall may be inflated on moments any LLM finds obvious and say little about moments only a human would pick. Blind precision@10 (EVAL check 3, Harshit rating outputs) is the more independent human signal, and should be named as such in the doc. Claude Code (this session) has not opened the filled worksheet or the CSV.
 - Reversible?: The wording is fixed by Harshit; the labels can be revised by hand.
+
+## D-034: CP-2 reviewer fixes: retry loop, per-run rejected settings, repair failure, cache key, gold input checks
+- Date: 2026-11-07 · Owner: Harshit (chose which to fix) / Claude (how) · Status: Proposed
+- Context: The Phase 3 independent review (CP-2) found 11 should-fix items. Harshit picked 4 code fixes plus boundary tests and the 3 gold-converter checks to do before run A.
+- Decision:
+  (1) `_call_with_retries` keeps two separate budgets: `max_attempts` counts real failures, and dropping a rejected setting is free (there are only 3 possible drops), so the loop always ends with a reply or the provider's real error. No more "unreachable".
+  (2) Generation-failure 400s (`json_validate_failed`, "Failed to generate/validate JSON") are checked before the rejected-parameter check, so they are retried even when their text mentions `response_format`. A setting the endpoint rejects is remembered per model for the run, in the run's config dict (`_rejected_params`, not a module global). A rejected schema falls back to JSON mode, then to no `response_format`.
+  (3) If the proposer's repair call fails, the episode keeps its valid first-round candidates. The broken ones are dropped with "repair failed: …" in the log. A wrong top-level `episode` field alone no longer triggers a repair call.
+  (4) The cache key includes the request settings `api_base`, `temperature`, `max_tokens` and `reasoning_effort` (always, as one dict), so two endpoints serving the same model name never share answers. Existing cache entries became invalid once; only experiment runs were cached.
+  (5) Gold converter: a present but unreadable arc `hook=`/`cliff=` is an error (no silent default; a trailing comma is tolerated); arc segments out of episode/time order give a warning; `note=` is split case-insensitively, so text inside a note is never read as a field.
+  (6) Boundary tests: exactly 60.0 s is a single cut and 60.1 s is not; exactly 20.0 s is a single cut and 19.9 s with dialogue right after is too_short; a hook exactly 3.0 s after the clip start passes.
+- Tests: 8 llm/propose tests and 6 gold tests (RED first), plus 5 boundary tests (they lock existing behaviour, so they passed at once). 200 tests total.
+- Not done (Harshit's call): no v1→v2 comparison (v3 has one, D-035). The nits are left for later.
+- Reversible?: Yes.
+
+## D-035: proposer_v3: the brief's verbatim definition plus 7 hard rules from the CP-2 review
+- Date: 2026-11-07 · Owner: Harshit (rules) / Claude (wording) · Status: Proposed
+- Context: Harshit's CP-2 review of the v2 smoke clips against the scripts: soft non-conflict hooks, spans too short to build, a vow used as a cliff, a beat_type that didn't match the hook, and a clip that built up to its strike instead of opening on it (ai_log #8).
+- Decision: proposer_v3 quotes the brief's promo definition word for word (source: docs/BRIEF_COMPLIANCE.md §B). It adds hard rules: (1) if the stretch contains a strike, slap or shocking reveal, that moment is the hook and the clip starts on it; (2) the hook must be conflict; (3) the cliff must be an open question, so a vow, resolve or answer is not a cliff; (4) hook start → cliff end ≥ 20 s; (5) quiet episodes return fewer or zero candidates, never soft ones; (6) beat_type describes the hook honestly; (7) variety. The worked example is unchanged (synthetic), and its reasoning no longer quotes times.
+- Before/after (gpt-oss-120b, same non-gold episodes 6, 24, 40; runs `smoke_T3.5_gptoss_20261107_200730` → `smoke_v3_gptoss_20261107_204635`): proposals 6 → 2; valid clips 4 → 2; too_short rejects 2 → 0; the quiet episode 2 proposals → 0. The episode containing a strike now opens on it (hook offset 1.7 s); before, the strike sat about 26 s into the clip. Both v3 clips have hook offsets ≤ 1.7 s, and both beat types now name the hook. Details are only in private/smoke_T3.5.md.
+- Risks seen: (a) yield drops to about 0.7 valid clips per episode, so run A may give about 35 candidates, enough for a top 20 but with less choice; (b) rule 1 can conflict with the cliff: one v3 clip opens on the episode's strongest line and then runs on to a weaker closing beat; (c) one v3 clip is 54.4 s with a slow middle, a case for the future "slow middle → jump-cut" rule. The judge and ranker should catch (b) and (c).
+- Reversible?: Yes (prompt versioned; the cache key includes the version).
