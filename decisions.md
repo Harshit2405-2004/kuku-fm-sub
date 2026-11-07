@@ -329,26 +329,26 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Reversible?: Yes (prompt versioned; the cache key includes the version).
 
 ## D-036: Judge design: first-3-seconds marker, batch and retry rules, brand-safety flag only
-- Date: 2026-11-07 · Owner: Claude (proposed) · Status: Proposed
+- Date: 2026-11-07 · Owner: Claude (proposed) · Status: Accepted (Harshit, 2026-11-08; none changes the evaluation method)
 - Context: TECH_SPEC §4.5 fixes the rubric and fields but not how the judge knows what "the first 3 s" are, or what to do when a batch reply is incomplete. Harshit (CP-2): score hook STRENGTH in the first 3 s; flag strikes and torture, don't exclude.
 - Decision: (1) lines that start in the first 3 s of the clip are marked `>>` in the excerpt, and the hook anchors score what is there (5 = strike/slap/shocking reveal inside 3 s, 3 = the big moment comes later). (2) Batches of 3 (config `judge.batch_size`; ~4.4k prompt tokens for 2 clips, so 3 fit under 8k tokens/minute). (3) A skipped clip is re-judged alone; a failed batch is retried clip by clip; still unscored → manifest error, not ranked, never given a default score. (4) graphic_violence carries no penalty; it adds "Brand-safety check before posting" to the posting note. (5) Qwen `<think>` text is stripped before JSON extraction.
 - Alternatives: no marker (the judge would score the best line anywhere); penalise violence (would bury the strongest hooks, against Harshit's call); default scores for unscored clips (fabrication).
 - Reversible?: Yes.
 
 ## D-037: Ranker details: greedy diversity, skip log, tie-break, code-written posting note
-- Date: 2026-11-07 · Owner: Claude (proposed) · Status: Proposed
+- Date: 2026-11-07 · Owner: Claude (proposed) · Status: Accepted (Harshit, 2026-11-08; none changes the evaluation method)
 - Context: TECH_SPEC §4.6 gives the formula and caps but not the algorithm, tie-breaks or the rationale wording.
 - Decision: scores normalised as (s − 1)/4; penalties from builder flags and judge risk_flags (only the keys in `rank.penalty`). Greedy diversity: at each position, take the highest promo that breaks no cap; a skipped promo is recorded once (rank, reason, final position). If every remaining promo breaks a cap, order is kept rather than leaving gaps. Ties break on hook, cliff, then id. posting_rationale is one sentence from the scores ≥ 4 / ≤ 2, the early-episode and sweet-spot bonuses, and flags. `rank.llm_rationale` stays false.
 - Reversible?: Yes (weights and caps in config; changing a weight needs a decision entry).
 
 ## D-038: Run orchestration: keep going on failure, write each stage early, `--episodes`, arcs deferred
-- Date: 2026-11-07 · Owner: Claude (proposed) · Status: Proposed
+- Date: 2026-11-07 · Owner: Claude (proposed) · Status: Accepted (Harshit, 2026-11-08; none changes the evaluation method)
 - Context: Run A is ~1 hour of free-tier calls; one 429 or bad reply must not lose the run.
 - Decision: a failed episode (proposer) or batch (judge) is logged in `manifest.errors` and the run continues; candidates.json/rejected.json are written before judging; the cache makes a rerun of finished work free. `--episodes 1,3,8` limits a run (for run B on the gold episodes). Two runs with the same name in the same minute get a `-2` suffix. Pipeline logic lives in `promo_finder/pipeline.py` so app.py reuses it. Arcs (T4.1) are built last, per Harshit's order; until then the manifest says `"arcs": "not run"`.
 - Reversible?: Yes.
 
 ## D-039: Arcs pair built candidates by ID (2 segments), instead of free block-ID segments
-- Date: 2026-11-07 · Owner: Claude (proposed) · Status: Proposed
+- Date: 2026-11-07 · Owner: Claude (proposed) · Status: Accepted (Harshit, 2026-11-08; none changes the evaluation method)
 - Context: TECH_SPEC §4.4 lets the arc model return 2–3 segments as {episode, start_block, end_block}. On Groq's free tier the arc prompt with full candidate detail was estimated at ~6.6k prompt + ~2.3k completion tokens, over 8k tokens/minute for one call. Arcs also had a 30-minute build cap.
 - Decision: the model only pairs two already-built single-episode candidates (opener → closer) by candidate ID; code cuts both parts on shot boundaries (opener's start → first clean shot end ≥ 8 s after the hook line; closer's tail sized to a 55 s total, ending on its own cliff). The input is one short line per candidate plus loglines shortened to 160 characters, only for episodes with candidates.
 - Alternatives: free block-ID segments (spec; bigger prompt, more to validate, more ways to cut a line in half); 3-segment arcs (left for later).
@@ -356,7 +356,7 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Reversible?: Yes (arcs.enabled: false turns it off).
 
 ## D-040: Correction to D-030: Groq checks prompt + max_tokens per request; retry "too large" with a lower max_tokens
-- Date: 2026-11-07 · Owner: Claude (proposed) · Status: Proposed
+- Date: 2026-11-07 · Owner: Claude (proposed) · Status: Accepted (Harshit, 2026-11-08; none changes the evaluation method)
 - Context: Run A (first start, 20:58) lost one long episode to "Request too large … Limit 8000, Requested 9050" (ai_log #10). D-030 was right that only actual tokens are charged to the window, but wrong to conclude max_tokens doesn't matter: each request's prompt + max_tokens must fit under the limit.
 - Decision: on that error, retry immediately with max_tokens = current − overshoot − 150, if that stays ≥ 1,000; otherwise fail the call. It doesn't use a retry attempt and doesn't wait. The cache key keeps the configured max_tokens. Config values are unchanged (proposer 4000, judge 3000), so short prompts still get the full budget.
 - Alternatives: lower max_tokens in config for everyone (D-030 showed 3000 can be too few for reasoning on some episodes); smaller judge batches (more calls).
@@ -364,7 +364,7 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Reversible?: Yes.
 
 ## D-041: How to finish run A after gpt-oss-120b's daily token quota ran out (needs Harshit)
-- Date: 2026-11-07 · Owner: Harshit (to decide) · Status: Proposed
+- Date: 2026-11-07 · Owner: Harshit (to decide) · Status: Accepted, then amended by D-042 (host changed)
 - Context: Groq free tier, gpt-oss-120b: 200,000 tokens/day. Run A finished 18/50 episodes (ai_log #11). The 32 left need about 7k tokens each (about 225k), plus the arc call. No billing (Harshit). Deadline: submit by 2026-11-08 17:00 IST.
 - Options:
   (a) Finish the 32 episodes tonight with a second Groq proposer model that has its own daily quota (e.g. gpt-oss-20b, same family and prompt), after a 1-token check and reading its limits; the manifest records two proposer models. Reruns of the 18 done episodes are free from the cache.
@@ -372,4 +372,18 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
   (c) Ship run A as a partial (18 episodes) and say so plainly; spend the remaining quota on run B (Gemini flash-lite proposer, gold episodes).
   (d) Groq Dev tier (paid) removes the cap: excluded by Harshit; note it in the doc as the scaling path.
 - Recommendation: (a), then arcs on the full candidate set, then run B on flash-lite as planned.
+- Reversible?: Yes.
+
+## D-042: Run A's missing 32 episodes served by gpt-oss-20b on Groq (OpenRouter fallback failed)
+- Date: 2026-11-08 · Owner: Claude (proposed) · Status: Proposed
+- Context: Harshit chose (D-041) to finish run A with the same model on another host, openrouter/openai/gpt-oss-120b:free, and, if that failed, to fall back to groq/openai/gpt-oss-20b. The OpenRouter 1-token call returned HTTP 401 "User not found" with a fresh, well-formed key (the /models endpoint accepted it; /key and chat did not), so the account side could not be fixed from here. Groq gpt-oss-20b answered a 1-token call (1000 requests/day, 8000 tokens/minute; Groq sends no daily-token header).
+- Decision: episodes 1, 2, 4–16, 19, 24, 40 stay on gpt-oss-120b (cache); the other 32 use gpt-oss-20b, same prompts (proposer_v3), same settings, same run folder. New CLI/config: `--run-dir`, `--episode-proposer "EPISODES=MODEL"`; the manifest records `proposer_model_by_episode`.
+- Alternatives: wait for the 120b daily quota (unverified window); ship 18 episodes only.
+- Consequences: **one run uses two proposer sizes** (120b and 20b), so quality may differ between episode groups; this is a stated limitation, not hidden. The judge is one model (qwen) for all clips, as required. The model-swap path (per-episode model, any api_base) is exercised.
+- Reversible?: Yes: rerun with `--episode-proposer` removed once 120b quota is back (the 20b results stay cached).
+- Qwen's remaining daily tokens could not be read from headers (none exist), so the "enough tokens" check was replaced by running the judge and stopping on a 429.
+
+## D-043: CP-3 reviewer items left unfixed (limitations)
+- Date: 2026-11-08 · Owner: Claude (proposed) · Status: Proposed
+- Decision (Harshit, 2026-11-08): fix only item (1) (the `arc_` prefix, commit c1dbcf6). Not fixed, listed as limitations: duplicate arc picks not deduped; a crash outside the per-episode/batch handlers leaves no manifest; mock test lacks arcs_raw.json / arc-row / keep-going cases; the judge excerpt drops a dialogue line already playing at a single's start; the lowered max_tokens is not reused on the JSON-repair retry; plus the nits in the CP-3 report entry.
 - Reversible?: Yes.
