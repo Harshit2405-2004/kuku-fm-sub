@@ -354,3 +354,11 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Alternatives: free block-ID segments (spec; bigger prompt, more to validate, more ways to cut a line in half); 3-segment arcs (left for later).
 - Consequences: arcs can only reuse moments the proposer already found; each arc has exactly 2 segments. The "early humiliation → late reveal" pattern is still possible if both are candidates.
 - Reversible?: Yes (arcs.enabled: false turns it off).
+
+## D-040: Correction to D-030: Groq checks prompt + max_tokens per request; retry "too large" with a lower max_tokens
+- Date: 2026-11-07 · Owner: Claude (proposed) · Status: Proposed
+- Context: Run A (first start, 20:58) lost one long episode to "Request too large … Limit 8000, Requested 9050" (ai_log #10). D-030 was right that only actual tokens are charged to the window, but wrong to conclude max_tokens doesn't matter: each request's prompt + max_tokens must fit under the limit.
+- Decision: on that error, retry immediately with max_tokens = current − overshoot − 150, if that stays ≥ 1,000; otherwise fail the call. It doesn't use a retry attempt and doesn't wait. The cache key keeps the configured max_tokens. Config values are unchanged (proposer 4000, judge 3000), so short prompts still get the full budget.
+- Alternatives: lower max_tokens in config for everyone (D-030 showed 3000 can be too few for reasoning on some episodes); smaller judge batches (more calls).
+- Consequences: on very long prompts the model gets less room to reason; if it runs out, Groq's json_validate_failed is retried as before and a persistent failure is a logged episode error.
+- Reversible?: Yes.

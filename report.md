@@ -499,3 +499,16 @@ A running log of every task Claude Code executes, in order. A new session must b
 **AI mistakes caught:** none (the failing test was my assumption, fixed in the test)
 **Open issues / risks:** run A (started 20:58) runs WITHOUT arcs because its config was loaded before arcs existed. The live arc call has to wait for run A, since both use gpt-oss on the same 8k tokens/minute. Plan: after run A, rerun the same command with arcs on (cache makes the rest free) and report both.
 **Next:** run A finishes → arcs live → CP-3
+
+### T4.5b: Fix "request too large" + restart run A  ·  2026-11-07 21:10  ·  status: done
+**Goal:** Run A's first start lost a long episode to a request-size error that retries could never fix.
+**What I did:** found it in run A's log after 7 episodes (1 failed); added the max_tokens step-down (D-040, TDD); stopped the first run A (kept as `outputs/20261107-2058-runA-aborted`) and restarted it with the fix and arcs enabled. The episodes it had finished came back from the cache.
+**Files changed:** promo_finder/llm.py, tests/test_llm.py, ai_log.md, decisions.md
+**Commands & results:**
+    first run A: 7 episodes done, 1 failed: "Request too large … Limit 8000, Requested 9050" after 4 retries of 2.5–8.5 s
+    $ pytest -q tests/test_llm.py → (RED) 2 failed, 35 passed → GREEN; $ pytest -q → 243 passed
+    $ git commit → ed2a079; run A restarted 21:10 IST
+**Decisions:** D-040 (Proposed; corrects D-030)
+**AI mistakes caught:** ai_log #10
+**Open issues / risks:** judge batches of 3 (about 6k prompt tokens) will now run with max_tokens lowered to about 1,500–1,800; the smoke reply for 2 clips was 430 tokens, so that should be enough.
+**Next:** run A finishes → CP-3
