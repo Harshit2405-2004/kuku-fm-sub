@@ -1,0 +1,64 @@
+# Kuku Promo Finder configuration. No secrets here: keys come from the env var named in api_key_env.
+# Every LLM stage picks its own model (D-005). Override from the CLI with --model / --proposer-model /
+# --judge-model / --api-base / --api-key-env (e.g. Kuku's OpenAI-compatible endpoint: model "openai/<name>").
+
+models:
+  # Model IDs verified on 2026-11-07 with a 1-token LiteLLM call each (D-022). Re-verify on a new day:
+  # free-tier model lists change often.
+  proposer:
+    model: gemini/gemini-3.5-flash
+    api_base: null
+    api_key_env: GEMINI_API_KEY
+    temperature: 0
+    max_tokens: 4000
+  arc:
+    model: gemini/gemini-3.5-flash
+    api_base: null
+    api_key_env: GEMINI_API_KEY
+    temperature: 0
+    max_tokens: 4000
+  judge:
+    # Different model family from the proposer, to reduce self-preference bias (D-006).
+    model: groq/openai/gpt-oss-120b
+    api_base: null
+    api_key_env: GROQ_API_KEY
+    temperature: 0
+    max_tokens: 4000
+
+concurrency: 2           # parallel LLM calls per stage
+rate_limit:
+  rpm: 10                # client-side cap per stage; free tiers throttle hard
+retries:
+  max_attempts: 5        # on 429 / 5xx, exponential backoff
+  backoff_base_s: 2
+  json_repair_attempts: 1  # on invalid JSON: retry once with the validation error appended
+
+cache_dir: .cache/llm
+
+# USD per 1M tokens, for the cost table in the manifest. Free-tier models are $0.
+# reference_paid: what the same token counts would cost on a paid model, for the scale estimate.
+# Fill these from the providers' pricing pages when writing the cost section; never guess (CLAUDE.md rule 4).
+prices:
+  gemini/gemini-3.5-flash: {input: 0, output: 0}
+  groq/openai/gpt-oss-120b: {input: 0, output: 0}
+  reference_paid: {model: null, input: null, output: null}
+
+build:
+  hook_max_offset_s: 3.0     # hook must start within this many seconds of the clip start
+  lead_in_target_s: 1.0      # preferred gap between clip start and hook
+  lead_in_window_s: 2.5      # look for a shot start this far before the hook
+  min_duration_s: 20.0
+  max_duration_s: 60.0
+  jumpcut_target_max_s: 55.0
+  jumpcut_s1_min_s: 12.0
+  jumpcut_s1_max_s: 25.0
+  extend_max_s: 8.0          # max forward extension for too-short clips
+  dedupe_iou: 0.5
+  arc_min_segment_s: 4.0
+
+rank:
+  weights: {hook: 0.35, cliff: 0.30, standalone: 0.20, trope_pull: 0.10, pacing: 0.05}
+  bonus: {early_ep_max: 5, early_ep: 0.06, mid_ep_max: 15, mid_ep: 0.03, sweet_spot: [30, 45], sweet_spot_bonus: 0.03, arc: 0.02}
+  penalty: {midshot_start: 0.03, midshot_end: 0.03, needs_context: 0.05, cliff_may_resolve: 0.05}
+  diversity: {top_n: 20, max_per_episode: 2, top_scene_n: 10, max_per_scene: 1}
+  llm_rationale: false

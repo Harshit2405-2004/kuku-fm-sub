@@ -167,3 +167,22 @@ A running log of every task Claude Code executes, in order. A new session must b
 **AI mistakes caught:** ai_log #2 (claimed "never crashes" without a test for malformed times; caught by the independent reviewer).
 **Open issues / risks:** Harshit's alias corrections, keyword changes and deadline didn't come through (the template placeholders were still in his message, and the files are unchanged). Pending.
 **Next:** T3.1
+
+### T3.1: Current free model IDs, verified  ·  2026-11-07  ·  status: done
+**Goal:** Find the current free-tier Gemini and Groq model IDs, verify each with a 1-token LiteLLM call, record them.
+**What I did:**
+- Web search (2 queries): contradictory limits and unconfirmable names, so I didn't use it for IDs (ai_log #3).
+- Listed models from `generativelanguage.googleapis.com/v1beta/models` and `api.groq.com/openai/v1/models` with our keys.
+- Made a 1-token `litellm.completion` call (temperature 0) to 5 candidates and checked `litellm.supports_response_schema`.
+- Wrote `config.yaml` (models per stage, concurrency, retries, cache, prices left unfilled until verified, build and rank parameters from TECH_SPEC §4).
+**Files changed:** config.yaml (new), decisions.md, ai_log.md
+**Commands & results:**
+    gemini/gemini-3.8-flash      157.9s schema=True  OK finish=length usage=3/0
+    gemini/gemini-3.5-flash        2.7s schema=True  OK finish=length usage=3/0
+    gemini/gemini-3.5-flash-lite   4.2s schema=True  OK finish=length usage=3/0
+    groq/openai/gpt-oss-120b       0.4s schema=True  OK finish=length usage=73/1
+    groq/qwen/qwen3.8-27b          0.1s schema=True  OK finish=length usage=14/1
+**Decisions:** D-022 (default models, Proposed)
+**AI mistakes caught:** ai_log #3 (web sources unreliable for model IDs)
+**Open issues / risks:** Free-tier daily quotas are unverified (Harshit to check AI Studio / Groq console). Gemini 3+ temperature deprecation warning.
+**Next:** T3.2

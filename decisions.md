@@ -189,3 +189,11 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Alternatives: Leave the variants as emotions or speakers (worse prompts, missed flags); keep banker's rounding (hard to explain, and timecodes reach editors).
 - Consequences: More real-world variants parse cleanly. Display timecodes can differ by 0.1 s from round(); stored times are untouched.
 - Reversible?: Yes.
+
+## D-022: Default free models: Gemini 3.5 Flash (proposer, arc) and gpt-oss-120b on Groq (judge)
+- Date: 2026-11-07 · Owner: Claude · Status: Proposed
+- Context: T3.1 asks for current free-tier IDs, verified live. Web sources disagreed and named models we couldn't confirm, so we listed models from each provider's own API with our keys, then made a 1-token LiteLLM call to each candidate.
+- Decision: proposer and arc = `gemini/gemini-3.5-flash` (OK in 2.7 s, LiteLLM schema support = True). Judge = `groq/openai/gpt-oss-120b` (OK in 0.4 s, schema = True; a different family from Gemini, per D-006; Groq lists strict JSON-schema decoding for it). Also verified as fallbacks: `gemini/gemini-3.5-flash-lite` (4.2 s), `groq/qwen/qwen3.8-27b` (0.1 s).
+- Alternatives: `gemini/gemini-3.8-flash` (newest; the call succeeded but took 157.9 s for 1 token, and one blog reports only ~20 requests/day on the free tier, which can't cover 50 episodes). Free-tier quotas are not published by API; Harshit should confirm them in AI Studio / the Groq console.
+- Consequences: LiteLLM warns that `temperature` is "planned for removal" for Gemini 3+. It works today and we keep temperature 0 (hard rule 8), but this is a known future break. With max_tokens=1 Gemini returned no text (reasoning tokens), so real calls need enough max_tokens (4000 set).
+- Reversible?: Yes (config.yaml or --proposer-model / --judge-model).

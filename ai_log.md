@@ -7,8 +7,8 @@ The brief asks: "In your doc, tell us which tools you used and **one place where
 |---|---|---|
 | Claude Code | Opus 5.5 (claude-opus-5-5) | Primary builder |
 | Plugins/skills | (from docs/SKILLS_AND_TOOLS.md) | Workflow: planning, TDD, review |
-| Runtime proposer | (from config.yaml) | Proposes promo candidates |
-| Runtime judge | (from config.yaml) | Scores candidates |
+| Runtime proposer | gemini/gemini-3.5-flash (D-022) | Proposes promo candidates |
+| Runtime judge | groq/openai/gpt-oss-120b (D-022) | Scores candidates |
 | Second AI (browser) | (fill in) | Independent critique |
 
 ## Mistakes log
@@ -17,6 +17,7 @@ The brief asks: "In your doc, tell us which tools you used and **one place where
 | 1 | 2026-11-07 kickoff | Claude Code (Opus 5.5) | First confidentiality scan reported only two show-specific lines in tracked docs; it cut each grep hit to 220 characters and missed a plot summary later on the same line of a research doc | Re-reading the line while applying Harshit's fixes | Sentence moved to private/; built scripts/leak_check.py, which scans whole lines against three word lists | A truncated grep is a sampling check, not a guarantee: confidentiality needs a script with no output limits |
 
 | 2 | 2026-11-07 CP-1 | Claude Code (Opus 5.5) | Claimed in D-018 and the parser docstring that bad input 'never crashes', but a malformed timestamp raised an exception that stopped the whole pack, and two format variants were dropped with no warning | independent-reviewer subagent probed mutated synthetic input | Bad times now warn and skip; added a line-coverage counter; 21 regression tests | A robustness claim needs a test for each failure class, not just the happy-path variants |
+| 3 | 2026-11-07 T3.1 | Web search (used by Claude Code) | Third-party pages gave contradictory free-tier limits and named model versions that couldn't be confirmed | Listing models from the providers' own APIs and making a 1-token call to each | Took IDs only from the live API lists plus test calls | For model IDs, the provider's API is the source of truth; blogs are leads, not facts |
 
 Examples of things worth logging:
 - The alias map draft merged two different characters, or split one into two
