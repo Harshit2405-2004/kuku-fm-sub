@@ -334,3 +334,35 @@ def test_dropped_param_is_remembered_for_the_rest_of_the_run(cfg):
     fake2 = FakeCompletion(response(GOOD))
     run(cfg, fake2, version="other_v")   # a later, uncached call to the same model
     assert "reasoning_effort" not in fake2.calls[0]
+
+
+# --- "Request too large" (ai_log #10): Groq checks prompt + max_tokens against the TPM limit per request,
+# so waiting never helps; lowering max_tokens by the overshoot does.
+
+TOO_LARGE = ('{"error":{"message":"Request too large for model `x` on tokens per minute (TPM): '
+             'Limit 8000, Requested 9050, please reduce your message size and try again."}}')
+
+
+def test_request_too_large_retries_at_once_with_lower_max_tokens(cfg):
+    cfg["models"]["proposer"]["max_tokens"] = 4000
+    fake = FakeCompletion(RateLimited({"x-ratelimit-reset-tokens": "2.5s"}, TOO_LARGE), response(GOOD))
+    (parsed, _), _, sleeps = run(cfg, fake)
+    assert parsed.block_id == "E03-B011" and sleeps == []           # no pointless wait
+    assert fake.calls[0]["max_tokens"] == 4000
+    assert fake.calls[1]["max_tokens"] == 4000 - 1050 - 150         # overshoot plus a small margin
+
+
+def test_request_too_large_with_no_room_left_fails_fast(cfg):
+    cfg["models"]["proposer"]["max_tokens"] = 1500                 # 1500 - 1200 = 300 < the floor
+    fake = FakeCompletion(RateLimited({}, TOO_LARGE), response(GOOD))
+    with pytest.raises(HTTPError):
+        run(cfg, fake)
+    assert len(fake.calls) == 1
+
+
+def test_too_large_cap_does_not_change_the_cache_key(cfg):
+    cfg["models"]["proposer"]["max_tokens"] = 4000
+    run(cfg, FakeCompletion(RateLimited({}, TOO_LARGE), response(GOOD)))
+    fake = FakeCompletion()                                          # second run: served from cache
+    (parsed, _), _, _ = run(cfg, fake)
+    assert parsed.block_id == "E03-B011" and fake.calls == []

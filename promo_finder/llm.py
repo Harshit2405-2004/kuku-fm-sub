@@ -29,6 +29,13 @@ RETRYABLE_STATUS = {408, 429, 500, 502, 503, 504}
 RETRYABLE_400_MARKERS = ("json_validate_failed", "Failed to generate JSON", "Failed to validate JSON")
 
 
+# Groq rejects a request whose prompt + max_tokens exceeds the per-minute token limit, whatever the
+# window holds, so no wait helps; a lower max_tokens does (ai_log #10).
+TOO_LARGE = re.compile(r"Request too large.*?Limit (\d+), Requested (\d+)", re.DOTALL)
+TOO_LARGE_MARGIN = 150        # tokens below the limit, for the provider's own counting differences
+MIN_COMPLETION_TOKENS = 1000  # below this, a reasoning model can't finish its answer: fail instead
+
+
 class LLMOutputError(Exception):
     """The model's reply still didn't match the schema after the repair retry."""
 
@@ -179,11 +186,26 @@ def _call_with_retries(completion_fn: Callable, stage_cfg: dict, messages: list[
     """
     max_attempts = retries.get("max_attempts", 5)
     attempt = 0
+    max_tokens_cap = None
     while True:
         kwargs = _completion_kwargs(stage_cfg, messages, schema, rejected)
+        if max_tokens_cap is not None:
+            kwargs["max_tokens"] = max_tokens_cap
         try:
             return completion_fn(**kwargs)
         except Exception as error:
+            too_large = TOO_LARGE.search(str(error))
+            if too_large and kwargs.get("max_tokens"):
+                limit, requested = int(too_large.group(1)), int(too_large.group(2))
+                lowered = kwargs["max_tokens"] - (requested - limit) - TOO_LARGE_MARGIN
+                if lowered < MIN_COMPLETION_TOKENS or lowered >= kwargs["max_tokens"]:
+                    raise
+                # Free like a dropped setting: each step strictly lowers max_tokens toward a floor.
+                # The cache key keeps the configured max_tokens, so a rerun hits the cache.
+                log.warning("%s: request too large (%d > %d tokens); retrying with max_tokens %d",
+                            kwargs["model"], requested, limit, lowered)
+                max_tokens_cap = lowered
+                continue
             status = _status(error)
             generation_failure = status == 400 and any(m in str(error) for m in RETRYABLE_400_MARKERS)
             dropped = None if generation_failure or status != 400 else _rejected_param(error, kwargs)
