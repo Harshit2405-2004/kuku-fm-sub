@@ -109,7 +109,7 @@ CP-4: final config is <run A | run B | mix: proposer=<…>, judge=<…>>, becaus
 
 ### Step 19: before pushing (CP-5)
 ```
-Run scripts/leak_check.py and `git status`, and show me both. List every file that will be pushed for the first time. Don't push — I will.
+Run `python scripts/leak_check.py --pre-push` and `git status`, and show me both. List every file that will be pushed for the first time. Don't push — I will.
 ```
 
 ### Changes at any checkpoint

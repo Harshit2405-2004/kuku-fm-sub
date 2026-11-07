@@ -8,6 +8,7 @@ Run as a CLI to print one episode, or a token table for the whole pack.
 from __future__ import annotations
 
 import argparse
+import math
 from pathlib import Path
 
 from promo_finder.aliases import load_aliases
@@ -17,8 +18,13 @@ TYPE_PREFIX = {"CAMERA": "CAM", "ACTION": "ACT", "SOUND_FX": "SFX"}
 
 
 def format_tc(seconds: float) -> str:
-    """Seconds -> 'MM:SS.s'. Rounds via whole tenths so 59.96 s becomes 01:00.0, not 00:60.0."""
-    tenths = round(seconds * 10)
+    """Seconds -> 'MM:SS.s', rounded half up to the nearest tenth.
+
+    Works in whole tenths so 59.96 s becomes 01:00.0, not 00:60.0. Python's round() rounds
+    halves to even (0.25 -> 0.2), so we add 0.5 and floor instead; the tiny epsilon absorbs
+    float error such as 1.25 * 10 = 12.499999...
+    """
+    tenths = math.floor(seconds * 10 + 0.5 + 1e-9)
     minutes, rest = divmod(tenths, 600)
     return f"{minutes:02d}:{rest / 10:04.1f}"
 
@@ -65,6 +71,8 @@ def main() -> None:
     parser.add_argument("--ep", type=int, help="episode number to print")
     parser.add_argument("--tokens", action="store_true", help="print estimated tokens per episode")
     args = parser.parse_args()
+    if args.ep is None and not args.tokens:
+        parser.error("give --ep N and/or --tokens")
 
     aliases, cast = load_aliases(Path(args.aliases))
     episodes, _ = load_pack(args.input, aliases)

@@ -119,7 +119,7 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 <!-- Claude Code: append new decisions below as D-013, D-014, … with Status: Proposed -->
 
 ## D-013: Use Python 3.13 for the venv (spec says 3.11+)
-- Date: 2026-11-07 · Owner: Claude · Status: Proposed
+- Date: 2026-11-07 · Owner: Claude · Status: Accepted (Harshit, CP-1)
 - Context: The kit venv was Python 3.10 (below the 3.11 floor). Python 3.11 isn't installed on the dev machine; 3.13 is.
 - Decision: Recreate `.venv` with `py -3.13`. Code stays 3.11-compatible (no 3.12+/3.13-only syntax), so `python>=3.11` in TECH_SPEC §9 still holds.
 - Alternatives: Install 3.11 with winget (extra setup step, no benefit we need); keep 3.10 (violates the spec).
@@ -159,7 +159,7 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Reversible?: n/a
 
 ## D-018: Parser tolerance rules where TECH_SPEC §3 is silent
-- Date: 2026-11-07 · Owner: Claude · Status: Proposed
+- Date: 2026-11-07 · Owner: Claude · Status: Accepted (Harshit, CP-1)
 - Context: §3.2 lists the warnings but not what happens to the affected block, or where speaker flags live.
 - Decision: (1) A block with no time line is skipped with a warning, and later IDs stay contiguous (so IDs always map to a timed block). (2) Speaker flags (O.S., V.O., O.C., CONT'D) are extracted from any paren group, including inside the emotion parens (the real pack has both forms), into a new `Block.flags` list. (3) A non-CAMERA/ACTION/SOUND FX label whose text isn't quoted becomes DIALOGUE with an "unquoted" warning (how we detect "unknown labels"). (4) "Outside its scene" uses a 0.1 s tolerance. (5) A scene missing start/end takes them from its blocks, with a warning. (6) Episodes are sorted by episode number, not filename; duplicates warn.
 - Alternatives: Fail the whole episode on a bad block (one typo would kill the live demo); keep untimed blocks with guessed times (code would invent timestamps).
@@ -167,9 +167,25 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Reversible?: Yes.
 
 ## D-019: Compact-view details where TECH_SPEC §4.1 is silent
-- Date: 2026-11-07 · Owner: Claude · Status: Proposed
+- Date: 2026-11-07 · Owner: Claude · Status: Accepted (Harshit, CP-1)
 - Context: §4.1 gives the block-line format but not scene boundaries, speaker flags or how tokens are counted.
 - Decision: (1) Add a `## SCENE n · heading · start–end` line before each scene, so the model sees where locations change (useful for cuts and the per-scene diversity cap). (2) Speaker shown as canonical name in caps, emotion in (), flags in [] (e.g. `VERA (Startled) [O.S.]`). (3) Timecodes use whole tenths so 59.96 s prints 01:00.0. (4) Tokens estimated as len/4, not `litellm.token_counter`, because the count only budgets calls, and the real per-model count is logged from API usage in Phase 3.
 - Alternatives: No scene lines (the model has to infer scene changes from times); litellm's tokenizer (model-specific, slower, and the estimate is only for planning).
 - Consequences: A few dozen extra tokens per episode. Real token usage still comes from the API response and goes into the manifest (NFR7).
+- Reversible?: Yes.
+
+## D-020: Parser and leak-check hardening after the CP-1 review
+- Date: 2026-11-07 · Owner: Harshit · Status: Accepted
+- Context: The independent reviewer found that a malformed timestamp crashed the whole pack, some unusual formats were dropped without a warning, a test passed for the wrong reason, and the leak check ignored staged files and git history.
+- Decision: (1) A malformed block time gives a warning and that block is skipped; a malformed scene time falls back to its blocks. (2) Every non-empty line is either placed (header, scene, block) or reported as an "unassigned line" warning. Episodes carry `lines_total` and `lines_unassigned`, and the parse summary prints the coverage (target 0 unassigned). (3) A file with no SCRIPT START marker starts at the first SCENE/block line, with a warning. Unknown `KEY:` header lines warn instead of being appended to the logline. Duplicate scene numbers warn once. (4) `leak_check.py` scans the working tree and staged blobs by default; `--pre-push` adds every line ever added on all branches plus every commit message.
+- Alternatives: Fail the episode on bad input (one typo kills the interview demo); scan only HEAD (a leak fixed in a later commit still ships with the push).
+- Consequences: Real pack: 11,931/11,931 lines placed, 0 unassigned, same 3,727 blocks. Pre-push now scans all history, which takes a few seconds.
+- Reversible?: Yes.
+
+## D-021: Small parser and display choices made during the CP-1 fixes
+- Date: 2026-11-07 · Owner: Claude · Status: Proposed
+- Context: The reviewer's nits left the exact choices to us.
+- Decision: Accept `**LABEL**:` as a block header. Normalise flag spellings (O.S / OS / Off-screen → O.S.; V.O / VO → V.O.; CONT'D with a curly apostrophe → CONT'D). Map label `SFX` to SOUND_FX like `SOUND FX`. Strip quotes per line in multi-line dialogue. `format_tc` rounds half up (0.25 → 0.3) instead of Python's half-to-even; this amends D-019. Add `pytest.ini` so tests run from any directory.
+- Alternatives: Leave the variants as emotions or speakers (worse prompts, missed flags); keep banker's rounding (hard to explain, and timecodes reach editors).
+- Consequences: More real-world variants parse cleanly. Display timecodes can differ by 0.1 s from round(); stored times are untouched.
 - Reversible?: Yes.

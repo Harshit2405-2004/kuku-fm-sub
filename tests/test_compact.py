@@ -1,15 +1,19 @@
 """Compact view tests (TECH_SPEC §4.1): the exact text the LLM sees, built from the synthetic show."""
 
+from pathlib import Path
+
 import pytest
 
 from promo_finder.aliases import load_aliases
 from promo_finder.compact import compact_episode, estimate_tokens, format_tc
 from promo_finder.parse import load_pack
 
+EXAMPLE = Path(__file__).resolve().parent.parent / "config" / "aliases.example.yaml"
+
 
 @pytest.fixture
 def episodes(synth_dir):
-    aliases, _ = load_aliases("config/aliases.example.yaml")
+    aliases, _ = load_aliases(EXAMPLE)
     eps, _ = load_pack(synth_dir, aliases)
     return {ep.ep: ep for ep in eps}
 
@@ -20,7 +24,7 @@ def episodes(synth_dir):
     (14.8, "00:14.8"),
     (112.0, "01:52.0"),
     (59.96, "01:00.0"),   # rounds up across the minute, never "00:60.0"
-    (3723.25, "62:03.2"),
+    (3723.25, "62:03.3"),   # half rounds up
 ])
 def test_format_tc(seconds, expected):
     assert format_tc(seconds) == expected
@@ -62,7 +66,7 @@ def test_one_line_per_block(episodes):
 
 
 def test_cast_line_only_when_cast_given(episodes):
-    _, cast = load_aliases("config/aliases.example.yaml")
+    _, cast = load_aliases(EXAMPLE)
     with_cast = compact_episode(episodes[1], cast)
     assert "CAST: Mara (young woman fighting her aunt for her inheritance); " in with_cast
     assert "CAST:" not in compact_episode(episodes[1])

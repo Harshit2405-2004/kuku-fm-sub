@@ -1,11 +1,12 @@
 """Alias map tests (TECH_SPEC §3.4, §11): synthetic example file only."""
 
 import logging
+from pathlib import Path
 
 from promo_finder.aliases import canonical_speaker, load_aliases
 from promo_finder.parse import load_pack, pack_stats
 
-EXAMPLE = "config/aliases.example.yaml"
+EXAMPLE = Path(__file__).resolve().parent.parent / "config" / "aliases.example.yaml"
 
 
 def test_load_example_aliases():

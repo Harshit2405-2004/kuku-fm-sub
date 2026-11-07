@@ -2,14 +2,15 @@
 
 Pipeline position: stage 1 (code only). Everything later points at blocks by ID (`E01-B037`),
 so IDs and times must be right. The parser is tolerant on purpose (any header casing, MM:SS or
-HH:MM:SS, CRLF, missing optional parts): oddities become warnings, never crashes.
+HH:MM:SS, CRLF, missing optional parts): oddities become warnings, never crashes. Every
+non-empty line is either used or reported as "unassigned", so nothing is dropped silently.
 """
 
 from __future__ import annotations
 
 import argparse
-import logging
 import json
+import logging
 import re
 import zipfile
 from collections import Counter
@@ -53,30 +54,40 @@ class Episode(BaseModel):
     duration: float
     scenes: list[Scene]
     blocks: list[Block]
+    lines_total: int = 0        # non-empty lines in the file
+    lines_unassigned: int = 0   # non-empty lines the parser could not place (target: 0)
 
 
 # Labels that are not speakers. Anything else in **LABEL:** is treated as a speaker (DIALOGUE).
 NON_DIALOGUE_LABELS = {"CAMERA": "CAMERA", "ACTION": "ACTION", "SOUND FX": "SOUND_FX", "SFX": "SOUND_FX"}
-SPEAKER_FLAGS = {"O.S.", "V.O.", "O.C.", "CONT'D"}
+# Spelling variants writers use for the same flag -> one canonical flag.
+FLAG_VARIANTS = {
+    "O.S.": "O.S.", "O.S": "O.S.", "OS": "O.S.", "OFF-SCREEN": "O.S.", "OFF SCREEN": "O.S.",
+    "V.O.": "V.O.", "V.O": "V.O.", "VO": "V.O.", "VOICE-OVER": "V.O.", "VOICE OVER": "V.O.",
+    "O.C.": "O.C.", "O.C": "O.C.",
+    "CONT'D": "CONT'D", "CONTD": "CONT'D",
+}
 # Real packs give block times to 0.01 s; allow a little slack before calling a block "outside its scene".
 SCENE_TOLERANCE_S = 0.1
 
-BLOCK_HEADER = re.compile(r"^\*\*(?P<label>[^*]+?):\*\*\s*$")
-TIME_LINE = re.compile(
-    r"start:\s*\(\s*(?P<start>[\d:.]+)\s*\)\s*\|\s*end:\s*\(\s*(?P<end>[\d:.]+)\s*\)", re.IGNORECASE
-)
-HEADER_KEY = re.compile(r"^\s*(episode number|episode logline|continuity notes)\s*:\s*(.*)$", re.IGNORECASE)
-SCENE_NUMBER = re.compile(r"^\s*scene\s+(\d+)\s*$", re.IGNORECASE)
-SCENE_HEADING = re.compile(r"^\s*scene heading\s*:\s*(.*)$", re.IGNORECASE)
-SCENE_START = re.compile(r"scene start\s*:\s*([\d:.]+)", re.IGNORECASE)
-SCENE_END = re.compile(r"scene end\s*:\s*([\d:.]+)", re.IGNORECASE)
-SCRIPT_START = re.compile(r"^\s*-+\s*script start\s*-+\s*$", re.IGNORECASE)
-SCRIPT_END = re.compile(r"^\s*-+\s*script end\s*-+\s*$", re.IGNORECASE)
+# Accepts **LABEL:** and the variant **LABEL**:
+BLOCK_HEADER = re.compile(r"^\*\*(?P<label>[^*]+?)(?::\*\*|\*\*:)\s*$")
+# Captures whatever is inside the parens, so a malformed time is reported instead of read as text.
+TIME_LINE = re.compile(r"start:\s*\((?P<start>[^)]*)\)\s*\|\s*end:\s*\((?P<end>[^)]*)\)", re.IGNORECASE)
+HEADER_KEY = re.compile(r"^(episode number|episode logline|continuity notes)\s*:\s*(.*)$", re.IGNORECASE)
+ANY_HEADER_KEY = re.compile(r"^[A-Za-z][A-Za-z ]{0,40}:\s")   # e.g. "WRITTEN BY: ..."
+SCENE_NUMBER = re.compile(r"^scene\s+(\d+)$", re.IGNORECASE)
+SCENE_HEADING = re.compile(r"^scene heading\s*:\s*(.*)$", re.IGNORECASE)
+SCENE_START = re.compile(r"scene start\s*:\s*(\S+)", re.IGNORECASE)
+SCENE_END = re.compile(r"scene end\s*:\s*(\S+)", re.IGNORECASE)
+ACTIONS_MARKER = re.compile(r"^actions and dialogue\s*:?$", re.IGNORECASE)
+SCRIPT_START = re.compile(r"^-+\s*script start\s*-+$", re.IGNORECASE)
+SCRIPT_END = re.compile(r"^-+\s*script end\s*-+$", re.IGNORECASE)
 EP_FROM_FILENAME = re.compile(r"episode[-_ ]?0*(\d+)", re.IGNORECASE)
 
 
 def parse_time(text: str) -> float:
-    """'MM:SS(.fff)' or 'HH:MM:SS(.fff)' -> seconds."""
+    """'MM:SS(.fff)' or 'HH:MM:SS(.fff)' -> seconds. Raises ValueError on anything else."""
     parts = text.strip().split(":")
     if len(parts) == 2:
         minutes, seconds = parts
@@ -101,9 +112,10 @@ def parse_speaker_label(label: str) -> tuple[str, str | None, list[str]]:
             part = part.strip()
             if not part:
                 continue
-            if part.upper() in SPEAKER_FLAGS:
-                if part.upper() not in flags:
-                    flags.append(part.upper())
+            flag = FLAG_VARIANTS.get(part.upper().replace("’", "'"))
+            if flag:
+                if flag not in flags:
+                    flags.append(flag)
             else:
                 emotions.append(part)
     return name, (", ".join(emotions) or None), flags
@@ -120,127 +132,197 @@ def _episode_number(header_value: str | None, source_file: str) -> int:
     raise ValueError(f"{source_file}: no episode number in header or filename")
 
 
+def _safe_time(text: str, where: str, warnings: list[str]) -> float | None:
+    try:
+        return parse_time(text)
+    except ValueError:
+        warnings.append(f"{where}: bad time {text.strip()!r}")
+        return None
+
+
+def _dialogue_text(text_lines: list[str]) -> tuple[str, bool]:
+    """Strip the quotes around spoken text. Returns (text, was_quoted).
+
+    Quotes are stripped per line first, so a line spoken across two quoted lines joins cleanly.
+    """
+    if text_lines and all(len(t) >= 2 and t[0] == '"' and t[-1] == '"' for t in text_lines):
+        return " ".join(t[1:-1].strip() for t in text_lines), True
+    joined = " ".join(text_lines)
+    if len(joined) >= 2 and joined[0] == '"' and joined[-1] == '"':
+        return joined[1:-1].strip(), True
+    return joined, False
+
+
+def _read_lines(lines: list[str]) -> dict:
+    """First pass: walk the lines once and sort each non-empty one into headers, scenes, blocks,
+    or "unassigned". No IDs or validation yet."""
+    out = {"headers": {}, "scenes": [], "blocks": [], "unassigned": [], "warnings": [],
+           "lines_total": 0, "has_marker": any(SCRIPT_START.match(l.strip()) for l in lines)}
+    current_header = None   # header key whose value may wrap onto the next line
+    in_script = False
+    after_end = False
+    pending = None          # the block being read
+
+    def close_block():
+        nonlocal pending
+        if pending is not None:
+            out["blocks"].append(pending)
+        pending = None
+
+    for lineno, line in enumerate(lines, start=1):
+        s = line.strip()
+        if not s:
+            current_header = None
+            if pending is not None and pending["text"]:
+                pending["text_done"] = True   # a blank line ends the block's text
+            continue
+        out["lines_total"] += 1
+
+        if after_end:
+            out["unassigned"].append((lineno, s))
+            continue
+        if not in_script:
+            if SCRIPT_START.match(s):
+                in_script = True
+                continue
+            starts_script = SCENE_NUMBER.match(s) or BLOCK_HEADER.match(s)
+            if out["has_marker"] or not starts_script:
+                key = HEADER_KEY.match(s)
+                if key:
+                    current_header = key.group(1).lower()
+                    out["headers"][current_header] = key.group(2).strip()
+                elif ANY_HEADER_KEY.match(s):
+                    current_header = None
+                    out["warnings"].append(f"unknown header line {lineno}: {s[:60]}")
+                    out["unassigned"].append((lineno, s))
+                elif current_header:
+                    out["headers"][current_header] += " " + s   # wrapped header value
+                else:
+                    out["unassigned"].append((lineno, s))
+                continue
+            in_script = True   # no marker: the first SCENE / block line starts the script
+
+        if SCRIPT_END.match(s):
+            close_block()
+            after_end = True
+            continue
+        header = BLOCK_HEADER.match(s)
+        if header:
+            close_block()
+            pending = {"label": header.group("label").strip(), "time_text": None, "text": [],
+                       "text_done": False, "scene_idx": len(out["scenes"]) - 1}
+            continue
+        scene_num = SCENE_NUMBER.match(s)
+        if scene_num:
+            close_block()
+            out["scenes"].append({"num": int(scene_num.group(1)), "heading": "", "start": None, "end": None,
+                                  "start_text": None, "end_text": None})
+            continue
+        if pending is None:
+            scene = out["scenes"][-1] if out["scenes"] else None
+            heading, start, end = SCENE_HEADING.match(s), SCENE_START.search(s), SCENE_END.search(s)
+            if scene is not None and (heading or start or end):
+                if heading:
+                    scene["heading"] = heading.group(1).strip()
+                if start:
+                    scene["start_text"] = start.group(1)
+                if end:
+                    scene["end_text"] = end.group(1)
+            elif not ACTIONS_MARKER.match(s):
+                out["unassigned"].append((lineno, s))
+            continue
+        times = TIME_LINE.search(s)
+        if times and pending["time_text"] is None and not pending["text"]:
+            pending["time_text"] = (times.group("start"), times.group("end"))
+        elif pending["text_done"]:
+            out["unassigned"].append((lineno, s))   # text after the block's blank-line end
+        else:
+            pending["text"].append(s)
+    close_block()
+    return out
+
+
 def parse_episode_text(
     text: str, source_file: str, aliases: dict[str, str] | None = None
 ) -> tuple[Episode, list[str]]:
     """Parse one episode file's text. Returns the episode and a list of warnings."""
     lines = text.replace("\r\n", "\n").replace("\r", "\n").lstrip("﻿").split("\n")
-    warnings: list[str] = []
-    headers: dict[str, str] = {}
-    scenes: list[dict] = []
-    raw_blocks: list[dict] = []   # blocks before IDs are assigned
-    current_header = None
-    in_script = False
-    pending: dict | None = None   # the block being read
+    raw = _read_lines(lines)
+    ep_num = _episode_number(raw["headers"].get("episode number"), source_file)
+    tag = f"E{ep_num:02d}"
+    warnings = [f"{tag} {w}" for w in raw["warnings"]]
+    if not raw["has_marker"]:
+        warnings.append(f"{tag}: no script start marker; script taken to start at the first SCENE/block line")
 
-    def close_block():
-        nonlocal pending
-        if pending is not None:
-            raw_blocks.append(pending)
-        pending = None
-
-    for line in lines:
-        stripped = line.strip()
-        if not in_script:
-            if SCRIPT_START.match(stripped):
-                in_script = True
-                continue
-            key_match = HEADER_KEY.match(line)
-            if key_match:
-                current_header = key_match.group(1).lower()
-                headers[current_header] = key_match.group(2).strip()
-            elif stripped and current_header:
-                # A header value that wraps onto the next line.
-                headers[current_header] += " " + stripped
-            elif not stripped:
-                current_header = None
-            continue
-
-        if SCRIPT_END.match(stripped):
-            break
-        header = BLOCK_HEADER.match(stripped)
-        if header:
-            close_block()
-            pending = {"label": header.group("label").strip(), "times": None, "text": [],
-                       "scene": scenes[-1]["num"] if scenes else 0, "text_done": False}
-            continue
-        if SCENE_NUMBER.match(stripped):
-            close_block()
-            scenes.append({"num": int(SCENE_NUMBER.match(stripped).group(1)), "heading": "",
-                           "start": None, "end": None})
-            continue
-        if scenes and pending is None:
-            heading = SCENE_HEADING.match(stripped)
-            if heading:
-                scenes[-1]["heading"] = heading.group(1).strip()
-            if SCENE_START.search(stripped):
-                scenes[-1]["start"] = parse_time(SCENE_START.search(stripped).group(1))
-            if SCENE_END.search(stripped):
-                scenes[-1]["end"] = parse_time(SCENE_END.search(stripped).group(1))
-            continue
-        if pending is None:
-            continue  # e.g. "Actions and dialogue:"
-        times = TIME_LINE.search(stripped)
-        if times and pending["times"] is None and not pending["text"]:
-            pending["times"] = (parse_time(times.group("start")), parse_time(times.group("end")))
-        elif not stripped:
-            # A blank line ends the block's text (but blank lines before any text are padding).
-            if pending["text"]:
-                pending["text_done"] = True
-        elif not pending["text_done"]:
-            pending["text"].append(stripped)
-    close_block()
-
-    ep_num = _episode_number(headers.get("episode number"), source_file)
+    # Blocks: assign IDs only to timed blocks, so every ID maps to a real time range (D-018).
     blocks: list[Block] = []
-    for raw in raw_blocks:
-        label_desc = f"block {len(blocks) + 1} ({raw['label']})"
-        if raw["times"] is None:
-            warnings.append(f"E{ep_num:02d} {label_desc}: missing times, block skipped")
+    block_scene_idx: list[int] = []
+    for rb in raw["blocks"]:
+        where = f"{tag} block {len(blocks) + 1} ({rb['label']})"
+        if rb["time_text"] is None:
+            warnings.append(f"{where}: missing times, block skipped")
             continue
-        block_id = f"E{ep_num:02d}-B{len(blocks) + 1:03d}"
-        text_value = " ".join(raw["text"])
-        label_upper = raw["label"].upper()
+        start = _safe_time(rb["time_text"][0], where, warnings)
+        end = _safe_time(rb["time_text"][1], where, warnings)
+        if start is None or end is None:
+            warnings.append(f"{where}: block skipped")
+            continue
+        block_id = f"{tag}-B{len(blocks) + 1:03d}"
+        label_upper = rb["label"].upper()
         speaker_raw = speaker = emotion = None
         flags: list[str] = []
         if label_upper in NON_DIALOGUE_LABELS:
             block_type = NON_DIALOGUE_LABELS[label_upper]
+            text_value = " ".join(rb["text"])
         else:
             block_type = "DIALOGUE"
-            speaker_raw, emotion, flags = parse_speaker_label(raw["label"])
+            speaker_raw, emotion, flags = parse_speaker_label(rb["label"])
             speaker = canonical_speaker(speaker_raw, aliases)
-            if len(text_value) >= 2 and text_value[0] == '"' and text_value[-1] == '"':
-                text_value = text_value[1:-1].strip()
-            else:
+            text_value, quoted = _dialogue_text(rb["text"])
+            if not quoted:
                 # Real dialogue is always quoted; an unquoted one is probably an unknown label.
-                warnings.append(f"{block_id}: unquoted text under label '{raw['label']}', treated as DIALOGUE")
-        start, end = raw["times"]
+                warnings.append(f"{block_id}: unquoted text under label '{rb['label']}', treated as DIALOGUE")
         if end < start:
             warnings.append(f"{block_id}: end < start ({end} < {start})")
-        blocks.append(Block(id=block_id, ep=ep_num, scene=raw["scene"], type=block_type,
+        scene_num = raw["scenes"][rb["scene_idx"]]["num"] if rb["scene_idx"] >= 0 else 0
+        blocks.append(Block(id=block_id, ep=ep_num, scene=scene_num, type=block_type,
                             speaker_raw=speaker_raw, speaker=speaker, emotion=emotion, flags=flags,
                             start=start, end=end, text=text_value))
+        block_scene_idx.append(rb["scene_idx"])
 
+    # Scenes: times, fallbacks, and the "outside its scene" check (by scene position, so a
+    # duplicated scene number doesn't mix two scenes' blocks).
     scene_models: list[Scene] = []
-    for s in scenes:
-        in_scene = [b for b in blocks if b.scene == s["num"]]
-        if s["start"] is None or s["end"] is None:
-            warnings.append(f"E{ep_num:02d} scene {s['num']}: missing start/end, taken from its blocks")
-            s["start"] = s["start"] if s["start"] is not None else min((b.start for b in in_scene), default=0.0)
-            s["end"] = s["end"] if s["end"] is not None else max((b.end for b in in_scene), default=0.0)
-        scene_models.append(Scene(ep=ep_num, num=s["num"], heading=s["heading"], start=s["start"], end=s["end"]))
+    seen_nums: set[int] = set()
+    for idx, s in enumerate(raw["scenes"]):
+        if s["num"] in seen_nums:
+            warnings.append(f"{tag}: duplicate scene number {s['num']}")
+        seen_nums.add(s["num"])
+        where = f"{tag} scene {s['num']}"
+        start = _safe_time(s["start_text"], where, warnings) if s["start_text"] else None
+        end = _safe_time(s["end_text"], where, warnings) if s["end_text"] else None
+        in_scene = [b for b, i in zip(blocks, block_scene_idx) if i == idx]
+        if start is None or end is None:
+            warnings.append(f"{where}: missing start/end, taken from its blocks")
+            start = start if start is not None else min((b.start for b in in_scene), default=0.0)
+            end = end if end is not None else max((b.end for b in in_scene), default=0.0)
+        scene_models.append(Scene(ep=ep_num, num=s["num"], heading=s["heading"], start=start, end=end))
         for b in in_scene:
-            if b.start < s["start"] - SCENE_TOLERANCE_S or b.end > s["end"] + SCENE_TOLERANCE_S:
-                warnings.append(f"{b.id}: outside scene {s['num']} range "
-                                f"({b.start}-{b.end} vs {s['start']}-{s['end']})")
+            if b.start < start - SCENE_TOLERANCE_S or b.end > end + SCENE_TOLERANCE_S:
+                warnings.append(f"{b.id}: outside scene {s['num']} range ({b.start}-{b.end} vs {start}-{end})")
 
+    if not blocks:
+        warnings.append(f"{tag}: 0 blocks parsed")
     if not any(b.type == "DIALOGUE" for b in blocks):
-        warnings.append(f"E{ep_num:02d}: episode has no dialogue")
+        warnings.append(f"{tag}: episode has no dialogue")
+    for lineno, s in raw["unassigned"]:
+        warnings.append(f"{tag} unassigned line {lineno}: {s[:60]}")
 
     duration = max([b.end for b in blocks] + [s.end for s in scene_models] + [0.0])
-    episode = Episode(ep=ep_num, source_file=source_file, logline=headers.get("episode logline", ""),
-                      continuity=headers.get("continuity notes", ""), duration=duration,
-                      scenes=scene_models, blocks=blocks)
+    episode = Episode(ep=ep_num, source_file=source_file, logline=raw["headers"].get("episode logline", ""),
+                      continuity=raw["headers"].get("continuity notes", ""), duration=duration,
+                      scenes=scene_models, blocks=blocks,
+                      lines_total=raw["lines_total"], lines_unassigned=len(raw["unassigned"]))
     return episode, warnings
 
 
@@ -290,6 +372,8 @@ def pack_stats(episodes: list[Episode]) -> dict:
         "duration_min": min(durations),
         "duration_max": max(durations),
         "duration_total": round(sum(durations), 2),
+        "lines_total": sum(e.lines_total for e in episodes),
+        "lines_unassigned": sum(e.lines_unassigned for e in episodes),
         "raw_speakers": dict(Counter(b.speaker_raw for b in blocks if b.type == "DIALOGUE")),
         "speakers": dict(Counter(b.speaker for b in blocks if b.type == "DIALOGUE")),
     }
@@ -311,6 +395,8 @@ def main() -> None:
     print("blocks by type:", stats["blocks_by_type"])
     print(f"duration: min {stats['duration_min']:.1f}s  max {stats['duration_max']:.1f}s  "
           f"total {stats['duration_total'] / 60:.1f} min")
+    print(f"line coverage: {stats['lines_total'] - stats['lines_unassigned']}/{stats['lines_total']} "
+          f"non-empty lines placed, {stats['lines_unassigned']} unassigned (target 0)")
     print(f"distinct raw speakers: {len(stats['raw_speakers'])}  canonical: {len(stats['speakers'])}")
     print(f"warnings: {len(warnings)}")
     for w in warnings:

@@ -16,6 +16,8 @@ The brief asks: "In your doc, tell us which tools you used and **one place where
 |---|---|---|---|---|---|---|
 | 1 | 2026-11-07 kickoff | Claude Code (Opus 5.5) | First confidentiality scan reported only two show-specific lines in tracked docs; it cut each grep hit to 220 characters and missed a plot summary later on the same line of a research doc | Re-reading the line while applying Harshit's fixes | Sentence moved to private/; built scripts/leak_check.py, which scans whole lines against three word lists | A truncated grep is a sampling check, not a guarantee: confidentiality needs a script with no output limits |
 
+| 2 | 2026-11-07 CP-1 | Claude Code (Opus 5.5) | Claimed in D-018 and the parser docstring that bad input 'never crashes', but a malformed timestamp raised an exception that stopped the whole pack, and two format variants were dropped with no warning | independent-reviewer subagent probed mutated synthetic input | Bad times now warn and skip; added a line-coverage counter; 21 regression tests | A robustness claim needs a test for each failure class, not just the happy-path variants |
+
 Examples of things worth logging:
 - The alias map draft merged two different characters, or split one into two
 - The runtime LLM returned a block ID that doesn't exist, or a hook block after the cliff block

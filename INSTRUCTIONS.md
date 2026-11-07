@@ -36,7 +36,7 @@ git commit -m "T0.2: project kit (specs, plan, Claude Code config)"
 
 ### Step 3: Create the public GitHub repo and push
 ```bash
-python scripts/leak_check.py   # always, before any push
+python scripts/leak_check.py --pre-push   # always, before any push (scans all commits + messages)
 gh repo create kuku-promo-finder --public --source . --remote origin --push
 ```
 Without gh: create an empty **public** repo on github.com, then `git remote add origin <url>`, `git branch -M main`, `git push -u origin main`.
@@ -170,7 +170,7 @@ Read both eval reports. Are the numbers believable? Choose the final config. Cla
 ### Step 19: Phase 6, app, README, deploy (🤖 about 60 min, 🧑 about 20 min)
 1. Claude builds the Streamlit app and the README, and runs `scripts/leak_check.py` (built at kickoff).
 2. 🧑 Test locally: `streamlit run app.py` → try the synthetic sample, then upload the real pack.
-3. 🧑 Push: `git push` (only after the leak check passes).
+3. 🧑 Push: `python scripts/leak_check.py --pre-push`, then `git push` (only if it passes).
 4. 🧑 Deploy: https://share.streamlit.io → **New app** → pick your repo, branch `main`, file `app.py` → **Advanced settings → Secrets**, then paste:
    ```toml
    GEMINI_API_KEY = "..."

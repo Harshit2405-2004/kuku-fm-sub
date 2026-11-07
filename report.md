@@ -149,3 +149,21 @@ A running log of every task Claude Code executes, in order. A new session must b
 - (e) The duration test passes for the wrong reason.
 - (f) The leak check reads the working tree, not staged blobs, and doesn't scan history or commit messages.
 - Nits: banker's rounding in format_tc, pytest only works from the repo root, multi-line quoted dialogue, more flag spellings, the SFX label alias isn't logged.
+
+### CP-1 fixes: parser hardening + leak check history scan  ·  2026-11-07  ·  status: done
+**Goal:** Apply Harshit's CP-1 instructions: malformed time → warning and skip; unknown formats → warning, never a silent drop; line-coverage check; duration test that can fail; leak check covering staged files, all history and commit messages (`--pre-push`).
+**What I did:**
+- RED: 21 new tests in `tests/test_parser_hardening.py` and `tests/test_leak_check.py`; 19 failed. The 2 duration tests passed at once because the logic was already right; the old test just couldn't tell whether it was. Each new test now pins one side of max().
+- Restructured `parse.py` into a line-reading pass that places or reports every non-empty line, plus a building pass (IDs, times, scenes, warnings). Same public API.
+- Rewrote `scripts/leak_check.py` as testable functions: `scan_working_tree`, `scan_staged`, `scan_history` (+ `--pre-push`). The tests use a throwaway git repo and a made-up keyword.
+- Nits: `**LABEL**:` header variant, flag spellings, multi-line quoted dialogue, half-up timecode rounding, a `pytest.ini` so tests run from any directory, and a compact CLI error when there are no args.
+**Files changed:** promo_finder/{parse,compact}.py, scripts/leak_check.py, tests/{test_parser_hardening,test_leak_check,test_compact,test_aliases}.py, pytest.ini, CLAUDE.md, INSTRUCTIONS.md, KICKOFF_PROMPT.md, docs/TECH_SPEC.md §11, decisions.md, ai_log.md
+**Commands & results:**
+    $ pytest -q → (RED) 19 failed, 2 passed (new tests only)
+    $ pytest -q → 89 passed (from repo root), 89 passed (from tests/)
+    $ python -m promo_finder.parse --input input → 50 eps, 3727 blocks (unchanged); line coverage 11931/11931 placed, 0 unassigned; 1 warning (unchanged)
+    $ python scripts/leak_check.py --pre-push → PASS (28 alias names, 40 keywords, 20 dialogue lines, full history)
+**Decisions:** D-013, D-018, D-019 → Accepted (Harshit, CP-1). D-020 (hardening, Accepted), D-021 (small choices, Proposed).
+**AI mistakes caught:** ai_log #2 (claimed "never crashes" without a test for malformed times; caught by the independent reviewer).
+**Open issues / risks:** Harshit's alias corrections, keyword changes and deadline didn't come through (the template placeholders were still in his message, and the files are unchanged). Pending.
+**Next:** T3.1
