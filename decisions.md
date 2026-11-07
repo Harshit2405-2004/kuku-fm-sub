@@ -307,7 +307,7 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Reversible?: The wording is fixed by Harshit; the labels can be revised by hand.
 
 ## D-034: CP-2 reviewer fixes: retry loop, per-run rejected settings, repair failure, cache key, gold input checks
-- Date: 2026-11-07 · Owner: Harshit (chose which to fix) / Claude (how) · Status: Proposed
+- Date: 2026-11-07 · Owner: Harshit (chose which to fix) / Claude (how) · Status: Accepted (Harshit, 2026-11-08)
 - Context: The Phase 3 independent review (CP-2) found 11 should-fix items. Harshit picked 4 code fixes plus boundary tests and the 3 gold-converter checks to do before run A.
 - Decision:
   (1) `_call_with_retries` keeps two separate budgets: `max_attempts` counts real failures, and dropping a rejected setting is free (there are only 3 possible drops), so the loop always ends with a reply or the provider's real error. No more "unreachable".
@@ -321,7 +321,7 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Reversible?: Yes.
 
 ## D-035: proposer_v3: the brief's verbatim definition plus 7 hard rules from the CP-2 review
-- Date: 2026-11-07 · Owner: Harshit (rules) / Claude (wording) · Status: Proposed
+- Date: 2026-11-07 · Owner: Harshit (rules) / Claude (wording) · Status: Accepted (Harshit, 2026-11-08)
 - Context: Harshit's CP-2 review of the v2 smoke clips against the scripts: soft non-conflict hooks, spans too short to build, a vow used as a cliff, a beat_type that didn't match the hook, and a clip that built up to its strike instead of opening on it (ai_log #8).
 - Decision: proposer_v3 quotes the brief's promo definition word for word (source: docs/BRIEF_COMPLIANCE.md §B). It adds hard rules: (1) if the stretch contains a strike, slap or shocking reveal, that moment is the hook and the clip starts on it; (2) the hook must be conflict; (3) the cliff must be an open question, so a vow, resolve or answer is not a cliff; (4) hook start → cliff end ≥ 20 s; (5) quiet episodes return fewer or zero candidates, never soft ones; (6) beat_type describes the hook honestly; (7) variety. The worked example is unchanged (synthetic), and its reasoning no longer quotes times.
 - Before/after (gpt-oss-120b, same non-gold episodes 6, 24, 40; runs `smoke_T3.5_gptoss_20261107_200730` → `smoke_v3_gptoss_20261107_204635`): proposals 6 → 2; valid clips 4 → 2; too_short rejects 2 → 0; the quiet episode 2 proposals → 0. The episode containing a strike now opens on it (hook offset 1.7 s); before, the strike sat about 26 s into the clip. Both v3 clips have hook offsets ≤ 1.7 s, and both beat types now name the hook. Details are only in private/smoke_T3.5.md.
@@ -364,7 +364,7 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Reversible?: Yes.
 
 ## D-041: How to finish run A after gpt-oss-120b's daily token quota ran out (needs Harshit)
-- Date: 2026-11-07 · Owner: Harshit (to decide) · Status: Accepted, then amended by D-042 (host changed)
+- Date: 2026-11-07 · Owner: Harshit (to decide) · Status: Accepted (Harshit, 2026-11-08), applied with groq/openai/gpt-oss-20b (see Applied/Deviation below)
 - Context: Groq free tier, gpt-oss-120b: 200,000 tokens/day. Run A finished 18/50 episodes (ai_log #11). The 32 left need about 7k tokens each (about 225k), plus the arc call. No billing (Harshit). Deadline: submit by 2026-11-08 17:00 IST.
 - Options:
   (a) Finish the 32 episodes tonight with a second Groq proposer model that has its own daily quota (e.g. gpt-oss-20b, same family and prompt), after a 1-token check and reading its limits; the manifest records two proposer models. Reruns of the 18 done episodes are free from the cache.
@@ -373,17 +373,18 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
   (d) Groq Dev tier (paid) removes the cap: excluded by Harshit; note it in the doc as the scaling path.
 - Recommendation: (a), then arcs on the full candidate set, then run B on flash-lite as planned.
 - Reversible?: Yes.
-
-## D-042: Run A's missing 32 episodes served by gpt-oss-20b on Groq (OpenRouter fallback failed)
-- Date: 2026-11-08 · Owner: Claude (proposed) · Status: Proposed
-- Context: Harshit chose (D-041) to finish run A with the same model on another host, openrouter/openai/gpt-oss-120b:free, and, if that failed, to fall back to groq/openai/gpt-oss-20b. The OpenRouter 1-token call returned HTTP 401 "User not found" with a fresh, well-formed key (the /models endpoint accepted it; /key and chat did not), so the account side could not be fixed from here. Groq gpt-oss-20b answered a 1-token call (1000 requests/day, 8000 tokens/minute; Groq sends no daily-token header).
-- Decision: episodes 1, 2, 4–16, 19, 24, 40 stay on gpt-oss-120b (cache); the other 32 use gpt-oss-20b, same prompts (proposer_v3), same settings, same run folder. New CLI/config: `--run-dir`, `--episode-proposer "EPISODES=MODEL"`; the manifest records `proposer_model_by_episode`.
-- Alternatives: wait for the 120b daily quota (unverified window); ship 18 episodes only.
-- Consequences: **one run uses two proposer sizes** (120b and 20b), so quality may differ between episode groups; this is a stated limitation, not hidden. The judge is one model (qwen) for all clips, as required. The model-swap path (per-episode model, any api_base) is exercised.
-- Reversible?: Yes: rerun with `--episode-proposer` removed once 120b quota is back (the 20b results stay cached).
-- Qwen's remaining daily tokens could not be read from headers (none exist), so the "enough tokens" check was replaced by running the judge and stopping on a 429.
+- **Applied (2026-11-08, Harshit): option (a) with groq/openai/gpt-oss-20b.** Harshit's first choice was openrouter/openai/gpt-oss-120b:free; its 1-token call returned HTTP 401 "User not found" with a fresh well-formed key (/models accepted it, /key and chat did not), so the fallback to 20b was used. Groq sends no daily-token header, so qwen's remaining quota could not be read; the judge runs and stops on a 429.
+- **Deviation (stated):** run A uses two proposer sizes. Episodes 1, 2, 4–16, 19, 24, 40 (18) on gpt-oss-120b; the other 32 on gpt-oss-20b. Same prompts and settings, same run folder; the manifest records `proposer_model_by_episode`. Episodes that fail on a daily quota are recorded as not processed (no retry, no further model switch). Judge: qwen for every clip.
 
 ## D-043: CP-3 reviewer items left unfixed (limitations)
 - Date: 2026-11-08 · Owner: Claude (proposed) · Status: Proposed
 - Decision (Harshit, 2026-11-08): fix only item (1) (the `arc_` prefix, commit c1dbcf6). Not fixed, listed as limitations: duplicate arc picks not deduped; a crash outside the per-episode/batch handlers leaves no manifest; mock test lacks arcs_raw.json / arc-row / keep-going cases; the judge excerpt drops a dialogue line already playing at a single's start; the lowered max_tokens is not reused on the JSON-repair retry; plus the nits in the CP-3 report entry.
 - Reversible?: Yes.
+
+## D-042: Ranker cliff gate: judge cliff below 3 can't be in the top 10
+- Date: 2026-11-08 · Owner: Harshit (decided) · Status: Accepted (Harshit, 2026-11-08; ranking rule, not the evaluation method)
+- Context: in the partial run A, 8 of 20 ranked clips had judge cliff 2/5, some ranked high because hook and standalone carried them (the D-035 risk).
+- Decision: `rank.min_cliff_top10: 3` in config.yaml. In the greedy order, a promo with cliff < 3 is skipped for positions 1–10 and moves below; it is never removed. If fewer than 10 promos pass, the remaining spots fill in score order. The skip is logged in `diversity_skips` with its reason. A finished run is re-ranked from `scored.json` by `rerank_run` (no LLM calls).
+- Alternatives: a cliff penalty in the score (softer, but a strong hook could still outweigh it); removing low-cliff promos (loses brief-compliant clips).
+- Consequences: the top 10 are cliff ≥ 3 by the judge's own rubric; the judge's cliff score is now load-bearing, so its calibration matters (see eval).
+- Reversible?: Yes: set `min_cliff_top10: null`.

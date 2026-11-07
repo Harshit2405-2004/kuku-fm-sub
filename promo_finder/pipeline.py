@@ -19,9 +19,9 @@ from promo_finder import report
 from promo_finder.aliases import load_aliases
 from promo_finder.arcs import propose_arcs
 from promo_finder.build import Candidate, build_candidate, dedupe
-from promo_finder.judge import judge_candidates
+from promo_finder.judge import ClipScore, judge_candidates
 from promo_finder.llm import load_prompt, summarize_usage
-from promo_finder.parse import load_pack, pack_stats
+from promo_finder.parse import Episode, load_pack, pack_stats
 from promo_finder.propose import propose_episode
 from promo_finder.rank import rank
 
@@ -206,3 +206,28 @@ def _run(input_path, cfg, run_id, run_dir, aliases_path, episodes_filter, comple
     report.write_json(run_dir / "manifest.json", manifest)
     log.info("run %s done: %d ranked, %d errors, %.0f s", run_id, len(ranked), len(errors), time.time() - started)
     return run_dir
+
+
+def rerank_run(run_dir: Path | str, cfg: dict) -> dict:
+    """Re-rank a finished run from its saved scored.json (no LLM calls) and rewrite ranked.json, promos.* and
+    review.md. Used when a ranking rule changes (D-042). Returns {before_top10, after_top10, moved_out}."""
+    run_dir = Path(run_dir)
+    scored = json.loads((run_dir / "scored.json").read_text(encoding="utf-8"))
+    episodes = {e["ep"]: Episode.model_validate(e) for e in json.loads((run_dir / "episodes.json").read_text(encoding="utf-8"))}
+    cands, scores = [], {}
+    for cid, row in scored.items():
+        row = dict(row)
+        scores[cid] = ClipScore.model_validate(row.pop("judge"))
+        cands.append(Candidate.model_validate(row))
+    old = json.loads((run_dir / "ranked.json").read_text(encoding="utf-8"))["ranked"]
+    before = [r["id"] for r in old[:10]]
+    ranked, skips, unscored = rank(cands, scores, episodes, cfg["rank"])
+    report.write_json(run_dir / "ranked.json", {"ranked": ranked, "diversity_skips": skips, "unscored": unscored})
+    report.write_promos(run_dir, ranked)
+    report.write_review(run_dir, ranked, skips, episodes, run_dir.name, cfg["rank"]["diversity"]["top_n"])
+    after = [r["id"] for r in ranked[:10]]
+    low = {r["id"] for r in ranked if r["scores"]["cliff"] < (cfg["rank"].get("min_cliff_top10") or 0)}
+    return {"before_top10": before, "after_top10": after,
+            "moved_out": [i for i in before if i not in after],
+            "low_cliff_in_before_top10": sum(1 for i in before if i in low),
+            "low_cliff_in_after_top10": sum(1 for i in after if i in low)}

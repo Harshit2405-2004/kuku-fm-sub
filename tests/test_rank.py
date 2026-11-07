@@ -120,3 +120,29 @@ def test_ties_break_deterministically(rcfg):
     for order in ([a, b], [b, a]):
         ranked, _, _ = rank(order, {"A": js("A"), "B": js("B")}, eps, rcfg)
         assert [r["id"] for r in ranked] == ["A", "B"]
+
+
+def test_cliff_gate_keeps_low_cliff_out_of_top10_but_not_removed(rcfg):
+    """D-042: 12 promos; the two best by score have cliff 2. They must drop below rank 10, still ranked."""
+    eps = {n: episode(n) for n in range(20, 32)}
+    cands = [cand(f"P{n}", ep=n) for n in range(20, 32)]
+    scores = {f"P{n}": (js(f"P{n}", cliff=2) if n in (20, 21) else js(f"P{n}", 2, 3, 2, 2, 2)) for n in range(20, 32)}
+    ranked, skips, _ = rank(cands, scores, eps, rcfg)
+    assert len(ranked) == 12
+    top10 = {r["id"] for r in ranked[:10]}
+    assert "P20" not in top10 and "P21" not in top10
+    assert {r["id"] for r in ranked[10:]} == {"P20", "P21"}
+    assert any("not allowed in the top 10" in s["reason"] for s in skips)
+
+
+def test_cliff_gate_off_when_not_configured(rcfg):
+    rcfg = {**rcfg, "min_cliff_top10": None}
+    eps = {20: episode(20)}
+    ranked, _, _ = rank([cand("A", ep=20)], {"A": js("A", cliff=1)}, eps, rcfg)
+    assert ranked[0]["rank"] == 1
+
+
+def test_cliff_gate_fills_spots_when_too_few_pass(rcfg):
+    eps = {n: episode(n) for n in (20, 21)}
+    ranked, _, _ = rank([cand("A", ep=20), cand("B", ep=21)], {"A": js("A", cliff=2), "B": js("B", cliff=2)}, eps, rcfg)
+    assert len(ranked) == 2          # nothing is removed; order falls back to score

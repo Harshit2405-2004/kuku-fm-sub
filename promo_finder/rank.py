@@ -42,9 +42,11 @@ def score_candidate(cand: Candidate, js: ClipScore, rcfg: dict) -> dict:
     return {"base": round(base, 4), "bonuses": bonuses, "penalties": penalties, "final_score": round(final, 4)}
 
 
-def diversify(rows: list[dict], dcfg: dict) -> tuple[list[dict], list[dict]]:
+def diversify(rows: list[dict], dcfg: dict, min_cliff_top10: int | None = None) -> tuple[list[dict], list[dict]]:
     """Greedy re-order: in the top `top_n` at most `max_per_episode` per episode, in the top `top_scene_n`
     at most `max_per_scene` per scene. A promo that would break a cap waits and the next one moves up.
+    Cliff gate (D-042): a promo whose judge cliff is below `min_cliff_top10` can't take a top-10 spot; it
+    waits below (never removed). If too few promos pass, the remaining spots fill in score order.
     Returns (ordered rows, skip records)."""
     pool = list(rows)                     # already sorted by final_score, best first
     ordered: list[dict] = []
@@ -54,7 +56,7 @@ def diversify(rows: list[dict], dcfg: dict) -> tuple[list[dict], list[dict]]:
         pos = len(ordered)
         pick = None
         for row in pool:
-            reason = _cap_broken(row, ordered, pos, dcfg)
+            reason = _cap_broken(row, ordered, pos, dcfg, min_cliff_top10)
             if reason is None:
                 pick = row
                 break
@@ -72,7 +74,9 @@ def diversify(rows: list[dict], dcfg: dict) -> tuple[list[dict], list[dict]]:
     return ordered, skips
 
 
-def _cap_broken(row: dict, ordered: list[dict], pos: int, dcfg: dict) -> str | None:
+def _cap_broken(row: dict, ordered: list[dict], pos: int, dcfg: dict, min_cliff_top10: int | None = None) -> str | None:
+    if min_cliff_top10 and pos < 10 and row["scores"]["cliff"] < min_cliff_top10:
+        return f"judge cliff {row['scores']['cliff']} is below {min_cliff_top10}: not allowed in the top 10"
     if pos < dcfg["top_n"]:
         same_ep = sum(1 for r in ordered[:dcfg["top_n"]] if r["episode_key"] == row["episode_key"])
         if same_ep >= dcfg["max_per_episode"]:
@@ -125,7 +129,7 @@ def rank(cands: list[Candidate], scores: dict[str, ClipScore], episodes: dict[in
                      "episode_key": cand.segments[0].ep, "scene_key": scene_key(cand, episodes)})
     # Ties break on hook, then cliff, then id, so the order never depends on input order.
     rows.sort(key=lambda r: (-r["final_score"], -r["scores"]["hook"], -r["scores"]["cliff"], r["id"]))
-    ordered, skips = diversify(rows, rcfg["diversity"])
+    ordered, skips = diversify(rows, rcfg["diversity"], rcfg.get("min_cliff_top10"))
     for i, row in enumerate(ordered, 1):
         row["rank"] = i
         row["posting_rationale"] = posting_rationale(row)

@@ -76,6 +76,7 @@ rank:
   weights: {hook: 0.35, cliff: 0.30, standalone: 0.20, trope_pull: 0.10, pacing: 0.05}
   bonus: {early_ep_max: 5, early_ep: 0.06, mid_ep_max: 15, mid_ep: 0.03, sweet_spot: [30, 45], sweet_spot_bonus: 0.03, arc: 0.02}
   penalty: {midshot_start: 0.03, midshot_end: 0.03, needs_context: 0.05, cliff_may_resolve: 0.05}
+  min_cliff_top10: 3      # D-042: a promo with judge cliff below this can't be in the top 10 (moves below, not removed)
   diversity: {top_n: 20, max_per_episode: 2, top_scene_n: 10, max_per_scene: 1}
   llm_rationale: false
 
