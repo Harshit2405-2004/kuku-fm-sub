@@ -205,3 +205,11 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Alternatives: tenacity for retries (optional per §9; a 10-line loop is easier to explain); caching every attempt (would make a bad reply "stick").
 - Consequences: Kuku's endpoint works even without JSON-schema support. Live check: both default models returned schema-valid JSON. Gemini 3.5 Flash billed 480 completion tokens for a ~170-character answer (hidden reasoning tokens), so token budgets and the cost estimate must use the reported usage, not the visible text.
 - Reversible?: Yes.
+
+## D-024: Cut-builder choices where TECH_SPEC §4.3 is silent
+- Date: 2026-11-07 · Owner: Harshit (tie rule) / Claude (rest) · Status: Proposed (tie rule approved by Harshit at kickoff)
+- Context: §4.3 leaves ties, a few edge cases and the role of the proposed start/end blocks open.
+- Decision: (1) Snap-start tie (two shots equally close to hook − 1 s): the earlier shot wins (more lead-in). (2) Shots are searched by time, not file order (real scripts list a line before the shot it sits under). (3) The cut is computed from the hook and cliff blocks only; the proposed start_block/end_block are stored for reference. Otherwise the 3 s hook rule and the no-leak end rule could be broken by the model. (4) A jump-cut whose only valid cut leaves < 20 s is rejected as `too_short`. (5) "Shot holding the cliff" = the camera shot with start < cliff end ≤ shot end; a cliff ending exactly on a shot boundary ends there. (6) A float tolerance of 1e-6 s is used at every boundary (exactly 3.0 s or 60.0 s passes).
+- Alternatives: Honour the model's start/end blocks (gives up code control of the two hardest constraints, against D-002's spirit); keep under-20 s jump-cuts with dur_ok=false (an invalid clip in the list).
+- Consequences: Validity is guaranteed by construction (EVAL check 1). The model's start/end picks can still be compared with ours in the failure gallery.
+- Reversible?: Yes.

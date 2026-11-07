@@ -202,3 +202,18 @@ A running log of every task Claude Code executes, in order. A new session must b
 **AI mistakes caught:** none
 **Open issues / risks:** Gemini's hidden reasoning tokens inflate completion tokens (480 for a tiny answer). Watch the free-tier token quotas in the full run.
 **Next:** T3.3
+
+### T3.3: build.py (cut builder) + tests  ·  2026-11-07  ·  status: done
+**Goal:** Pure-code conversion of proposed block IDs into checked clips: snapping, 20–60 s rules, jump-cut (D-015), extend/reject, dedupe, validity flags (TECH_SPEC §4.3).
+**What I did:**
+- Tests first (RED: collection error). While checking the fixtures by hand I found 2 of my own jump-cut fixtures were wrong (they'd produce < 20 s cuts); I corrected them and added a test for that case.
+- `build.py`: `snap_start`, `snap_end`, `_jumpcut`, `_extend_short`, `validity_checks`, `build_candidate` → `Candidate | Rejected`, `dedupe`, `interval_iou`.
+- PROCESS_GUIDE Process 3 numbers reproduced exactly as unit tests: single cut on synthetic ep 3 (12.0–47.0, hook offset 1.0 s, 35.0 s, start/end blocks E03-B010/E03-B029); jump-cut [4.0–19.5]+[62.0–98.5] = 52.0 s; too short extended to 38.5 s (19.5 s) then rejected.
+**Files changed:** promo_finder/build.py, tests/test_build.py
+**Commands & results:**
+    $ pytest -q tests/test_build.py → (RED) 1 error during collection
+    $ pytest -q → 130 passed in 9.27s (19 build tests)
+**Decisions:** D-024 (tie rule + builder choices, Proposed)
+**AI mistakes caught:** two wrong test fixtures (Claude), caught by hand-checking the expected numbers before implementing; not logged in ai_log since they never reached a test run
+**Open issues / risks:** none
+**Next:** T3.4
