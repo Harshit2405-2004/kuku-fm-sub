@@ -77,3 +77,6 @@ rank:
   penalty: {midshot_start: 0.03, midshot_end: 0.03, needs_context: 0.05, cliff_may_resolve: 0.05}
   diversity: {top_n: 20, max_per_episode: 2, top_scene_n: 10, max_per_scene: 1}
   llm_rationale: false
+
+judge:
+  batch_size: 3            # clips per judge call; ~3 full excerpts keep one call under Groq's 8k tokens/minute

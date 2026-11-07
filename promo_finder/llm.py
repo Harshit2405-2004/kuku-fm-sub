@@ -37,6 +37,11 @@ def extract_json(text: str | None) -> str:
     """Pull the JSON object out of a reply that may have ``` fences or prose around it."""
     if not text:
         return ""
+    # Reasoning models (e.g. Qwen 3) may put <think>…</think> before the answer; braces inside it
+    # would otherwise be taken as the start of the JSON.
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+    if "<think>" in text:
+        text = text.split("</think>")[-1] if "</think>" in text else text.split("<think>")[0]
     fenced = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
     if fenced:
         text = fenced.group(1)

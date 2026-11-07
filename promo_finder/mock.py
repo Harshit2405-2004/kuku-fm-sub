@@ -51,8 +51,35 @@ def mock_proposer(messages: list[dict]) -> dict:
     return {"episode": episode, "candidates": []}
 
 
+CLIP_HEADER = re.compile(r"^CLIP (?P<id>\S+) ·")
+
+
+def mock_judge(messages: list[dict]) -> dict:
+    """Score each clip in the prompt: hook 4 if a `>>` line has ? or !, else 2; the rest fixed.
+    Deterministic, so ranking tests and the demo give the same order every time."""
+    text = messages[-1]["content"] if messages else ""
+    scores, current = [], None
+    for line in text.splitlines() + ["CLIP END ·"]:
+        header = CLIP_HEADER.match(line)
+        if header:
+            if current:
+                scores.append(current)
+            current = None if header["id"] == "END" else {
+                "id": header["id"], "hook_text": "none", "cliff_text": "", "reasons": "mock judge",
+                "hook": 2, "cliff": 3, "standalone": 3, "trope_pull": 3, "pacing": 3,
+                "why": "mock score", "risk_flags": []}
+        elif current and LINE.match(line.removeprefix(">> ").strip()):
+            body = LINE.match(line.removeprefix(">> ").strip())["text"]
+            if line.startswith(">> ") and ("?" in body or "!" in body):
+                current["hook"], current["hook_text"] = 4, body[:80]
+            current["cliff_text"] = body[:80]
+    return {"scores": scores}
+
+
 def respond(stage: str, messages: list[dict]) -> str:
     """Return the raw JSON text a model would have returned for this stage."""
     if stage == "proposer":
         return json.dumps(mock_proposer(messages))
+    if stage == "judge":
+        return json.dumps(mock_judge(messages))
     raise NotImplementedError(f"mock reply for stage '{stage}' not built yet")
