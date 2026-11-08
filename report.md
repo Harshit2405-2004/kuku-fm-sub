@@ -656,3 +656,7 @@ Different episodes, so it's indicative, not a controlled comparison.
 **Commands & results:** Streamlit AppTest: sample + Run in mock mode → table with 4 ranked clips, 0 errors; `pytest -q` and leak_check results below.
 **Decisions:** D-044 · **AI mistakes caught:** ai_log #14
 **Next:** merge `app` into main, deploy, README reviewer box (text needed)
+
+### Recall sprint steps 1–2  ·  2026-11-08  ·  status: done (branch `recall-sprint`)
+**Prompt:** `proposer_v4.md` added (v3 untouched): rule 1 softened to "prefer opening on a strike/slap/reveal; otherwise the strongest conflict line"; "up to 4 candidates, usually 2–4, zero only for quiet episodes". Why: test whether more candidates and a softer opening rule raise recall. Not wired into the default config.
+**Commands & results:** `scripts/recall_pool.py` (pooled recall, counts only), `scripts/propose_only.py` (proposer+build only into a new run folder). v4 on the 10 gold episodes: 10 proposed, 9 built (v3: 12 proposed, 9 built); run folders `20261108-1716-v4gold` (new); runs A and B untouched.

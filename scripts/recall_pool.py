@@ -1,6 +1,6 @@
 """Recall of candidate pools against the gold set, split into dev and held-out episodes (counts only).
 
-Used by the recall sprint: pool candidates from several run folders (or only the ranked ones) and score them
+Used by the recall sprint: pool candidates from several run folders (or only the ranked ones, or ':singles' to drop cross-episode arcs) and score them
 with the same matching rule as evaluate.py (metrics.match_level, never changed). Nothing from the gold file is
 printed except counts. Usage:
   python scripts/recall_pool.py "label=outputs/runA[:ranked]+outputs/runB" ...
@@ -27,7 +27,8 @@ def load_pool(spec: str) -> list[dict]:
         path, _, kind = part.partition(":")
         name = "ranked.json" if kind == "ranked" else "candidates.json"
         data = json.loads((Path(path) / name).read_text(encoding="utf-8"))
-        pool += data["ranked"] if kind == "ranked" else data
+        rows = data["ranked"] if kind == "ranked" else data
+        pool += [r for r in rows if r.get("type") != "arc"] if kind == "singles" else rows
     return pool
 
 
