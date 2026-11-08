@@ -3,7 +3,7 @@
 Reads a microdrama screenplay pack (timestamped episode scripts) and outputs a **ranked shortlist of 20–60 s promo clips**. Each clip has its episode, the start and end time of every segment, the hook, the cliffhanger, scores from a judge model, and one line on why it works. Built for the Kuku AI Generalist take-home, Problem 1.
 
 > **For Kuku reviewers — start here**
-> - **Try it:** [live app](APP_URL_PLACEHOLDER) (mock mode needs no key) · or `python run.py --input samples/synthetic_show --mock`
+> - **Try it:** [live app](https://kuku-fm-sub.streamlit.app/) (mock mode needs no key) · or `python run.py --input samples/synthetic_show --mock`
 > - **Results (run A, 50 episodes):** 30/30 clips valid (20–60 s, hook ≤ 3 s, shot-aligned) · blind human precision@10 **6/10** · gold recall 3/13 strict, 6/13 lenient (missed target, analysed in the doc) · judge–human Spearman 0.25 → human stays in the loop.
 > - **Design in one line:** the LLM picks *line IDs*; code computes every timestamp, so invented times are impossible by construction.
 > - **Swap in your model:** `python run.py --input <pack> --model openai/<model> --api-base <url> --api-key-env KEY`
@@ -47,7 +47,7 @@ streamlit run app.py
 
 Upload a `.zip` or several episode `.txt` files, or click **Try the fictional sample**, then **Run**. Mock mode is on by default (no key needed). Turn it off to use a real model: set the proposer and judge model names, an optional OpenAI-compatible API base, and paste an API key. The key is used only inside the running process for that run; it is not written to disk, logs, cache or the run manifest. Uploads and outputs go to a temporary folder per session. Results show as a ranked table with script excerpts, plus downloads for `promos.csv` and `review.md`.
 
-Live app: _link to be added after deploy_.
+Live app: https://kuku-fm-sub.streamlit.app/
 
 ## Swap the model
 
