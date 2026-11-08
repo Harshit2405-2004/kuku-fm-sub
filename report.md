@@ -640,3 +640,13 @@ Different episodes, so it's indicative, not a controlled comparison.
 **Commands & results:** `python scripts/leak_check.py --pre-push` → PASS; `pytest -q` → 265 passed
 **Decisions:** none · **AI mistakes caught:** none
 **Next:** Harshit rates the blind sheet; judge rerun when qwen's quota resets
+
+### T6.3 Results sheet with human ratings  ·  2026-11-08  ·  status: done
+**What I did:** ran evaluate.py on run A with the 15 human blind ratings and `--compare` run B; wrote the one-page results sheet to `private/results_sheet.md` (details are private; this entry holds numbers only).
+**Commands & results:** `python evaluate.py --run outputs/20261107-2103-runA --gold gold/gold_labels.csv --ratings gold/precision_ratings.csv --compare outputs/20261108-0450-runB` → valid 30/30 · episodes 50/50 · recall any strict 3/13, lenient 6/13 · recall@20 strict 0/13, lenient 3/13 · precision@10 6/10 would post · judge–human Spearman 0.25 (15 rated) · top-10 Jaccard A vs B 0.05
+      run B (10 episodes): recall any strict 1/13, lenient 5/13 · recall@20 strict 1/13, lenient 5/13 · quiet false positives 1
+      tokens run A (as run): 328,974 in / 90,124 out; extrapolated to 56 judged clips ≈ 383k in / 95k out. Paid costs in the sheet use ASSUMED prices (no real price list was used).
+**Decisions:** none · **AI mistakes caught:** none
+**Targets met / missed:** precision@10 met (6/10); recall (any and @20) and Spearman (> 0.4) missed.
+**Open issues / risks:** judge covers 30/56 clips in run A; gold is LLM-drafted and human-approved (D-033).
+**Next:** judge rerun after quota resets; submit
