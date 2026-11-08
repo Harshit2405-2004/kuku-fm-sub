@@ -675,3 +675,6 @@ Different episodes, so it's indicative, not a controlled comparison.
 **Commands & results:** `scripts/propose_only.py --prompt proposer_v4b` on the 10 gold episodes → run `20261108-1736-v4bgold`: 18 proposed, 13 built, 0 too_short, 5 duplicates; dev recall 1/8 strict, 5/8 lenient; held-out 3/5 strict, 4/5 lenient (v3: 0/2 and 1/3). Proposer tokens vs v3: +7,952 prompt, +1,485 completion.
 **Decisions:** D-047 (v4b default on this branch) · **AI mistakes caught:** ai_log #16
 **Not re-measured:** precision, judge top-20, duplicates in the final ranking.
+
+### recall-sprint push verification  ·  2026-11-08  ·  status: done
+**Result:** branch `recall-sprint` pushed to origin; `pytest -q` 272 passed; mock run on the synthetic sample 4 ranked, 0 errors; `leak_check --pre-push` PASS; main unchanged at `1e74c71`. No fixes were needed.
