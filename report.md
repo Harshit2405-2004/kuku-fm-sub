@@ -603,3 +603,34 @@ Different episodes, so it's indicative, not a controlled comparison. Arc promos 
 **AI mistakes caught:** none
 **Limitations / risks:** the 6-promo run A recall has very wide uncertainty; run A and run B differ in proposer, coverage and arcs model, so the A/B Jaccard is only indicative; qwen's input-tokens-per-minute cap (7,000) breaks batches of 3 on long excerpts (recovered, but slow, 213 s for 10 clips).
 **Next:** Harshit rates `gold/precision_ratings.csv`, then `python evaluate.py --run outputs/20261107-2103-runA --gold gold/gold_labels.csv --ratings gold/precision_ratings.csv`; CP-3 review; failure gallery
+
+### Run A, second completion pass (E25 probe, 120b, flash-lite) + eval + blind sheet  ·  2026-11-08 05:45–06:35  ·  status: done, judge PARTIAL (30/56 scored)
+**Goal:** Use the reset Groq quotas to finish the missing episodes; re-judge, re-rank, re-evaluate, regenerate the blind sheet.
+**What I did:**
+- Probe: E25 on gpt-oss-120b (scratch folder, shared cache): OK (2 clips, 45 s). Pass 2: the other missing episodes on 120b in the run A folder: 6 more succeeded, 16 failed on 120b's **daily** limit (never retried), E03 and E27 on the per-minute limit. Pass 3: those 18 episodes on gemini-3.5-flash-lite (new `|KEY_ENV` suffix on `--episode-proposer`, 1 test), arcs on flash-lite: **0 proposer failures.**
+- **Run A: 50/50 episodes processed.** Proposer by episode: gpt-oss-120b 24, gpt-oss-20b 8, gemini-3.5-flash-lite 18. Judge: qwen3.8-27b only.
+- Judge stopped on qwen's **daily** token limit (37 errors, "Used 199562, Limit 200000"). **Scored 30 of 56 built clips; 26 unscored** (17 flash-lite episodes, 6 gpt-oss-120b, 1 gpt-oss-20b, both arcs). Not retried (ai_log #13: judge batches shifted when early episodes were added, so the cache missed).
+- Evaluated and re-made the blind sheet from the new top 15 (overwrote the unrated one).
+**Commands & results:**
+    pass 2: run.py ... --run-dir outputs/20261107-2103-runA --episode-proposer "17-18,20-23,28-29=groq/openai/gpt-oss-20b" → 32/50 episodes · proposer 120b daily limit reached · 736 s
+    pass 3: run.py ... --episode-proposer "...=groq/openai/gpt-oss-20b" --episode-proposer "3,27,33-36,38-39,41-50=gemini/gemini-3.5-flash-lite|GEMINI_API_KEY" --arc-model gemini/gemini-3.5-flash-lite --api-key-env GEMINI_API_KEY → 742 s wall
+      proposer: 52 calls (37 cache hits) · 261,883 prompt / 84,613 completion tokens (all three models) · arc: 1 call, 4,532 / 349 tokens (flash-lite), 2 arcs built, 1 rejected · judge: 14 calls (7 cache hits), 62,559 / 5,162 tokens, 708 s
+      counts: proposed 62 · built 56 · rejected 8 · scored 30 · ranked 30 · unscored 26 · 45 episodes with a clip · 30 ranked = 15 single + 15 jumpcut, 22.3–56.5 s, hook ≤ 3 s 30/30
+      ranked cliff scores (count): 1:1 · 2:9 · 3:1 · 4:7 · 5:12 · top-10 cliffs 5,5,5,5,4,4,4,5,5,5 (gate: none moved)
+    $ python evaluate.py --run outputs/20261107-2103-runA --gold gold/gold_labels.csv → valid 30/30 · episodes processed 50/50
+      gold promos 13 (all in processed episodes) · recall any candidate (56 built clips): strict 3/13, lenient 6/13 · recall@20 (of the 30 ranked): strict 0/13, lenient 3/13 · quiet false positives in top 20: 0
+    top-10 Jaccard run A vs run B: 0.05
+**By proposer model:** (singles and jumpcuts ranked; the flash-lite row has only 1 ranked clip because 17 of its clips are unscored, so its means are NOT meaningful)
+
+| proposer model | episodes | proposals | built | singles ranked | mean hook | mean cliff | mean standalone |
+|---|---|---|---|---|---|---|---|
+| gpt-oss-120b | 24 | 31 | 28 | 22 | 4.05 | 3.73 | 4.23 |
+| gpt-oss-20b | 8 | 9 | 8 | 7 | 3.71 | 3.71 | 3.71 |
+| gemini-3.5-flash-lite | 18 | 22 | 18 | 1 | 5.00 | 2.00 | 4.00 |
+
+Different episodes, so it's indicative, not a controlled comparison.
+**Decisions:** D-041 updated (second attempt, three proposers)
+**AI mistakes caught:** ai_log #13
+**Targets MISSED:** gold recall (any) ≥ 70% and recall@20 ≥ 50%, strict and lenient. recall@20 is also depressed because 26 clips could not be ranked.
+**Limitations / risks:** run A mixes three proposers and the ranking misses 26 unscored clips (mostly the flash-lite episodes); a rerun of the judge after qwen's quota resets would complete it (the 30 scored ones come from the cache; the batch shift means some re-judging).
+**Next:** rate `gold/precision_ratings.csv`; judge rerun when quota allows; package
