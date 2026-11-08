@@ -49,6 +49,7 @@ python run.py --input input/<pack> --model openai/<their-model> \
 # a different proposer for some episodes only (e.g. when one model's daily quota runs out)
 python run.py --input input/<pack> --run-dir outputs/<existing-run> \
     --episode-proposer "17-18,20-23=groq/openai/gpt-oss-20b"
+#   another provider for those episodes: "33-36=gemini/<model>|GEMINI_API_KEY" (the part after | is the key's env var name)
 
 # continue in a finished or partial run folder: episodes already done come from the cache
 python run.py --input input/<pack> --run-dir outputs/<existing-run>

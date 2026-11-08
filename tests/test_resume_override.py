@@ -11,6 +11,11 @@ def test_parse_episode_proposers_ranges_and_lists():
     assert sorted(got) == [3, 17, 18, 19] and got[18] == {"model": "groq/x"}
 
 
+def test_parse_episode_proposers_key_env_suffix():
+    got = parse_episode_proposers(["5-6=gemini/x|GEMINI_API_KEY"], {})
+    assert got[5] == {"model": "gemini/x", "api_key_env": "GEMINI_API_KEY"} and got[6] == got[5]
+
+
 def test_override_only_touches_listed_episodes():
     cfg = load_config("config.yaml")
     cfg["episode_proposers"] = {3: {"model": "groq/other"}}

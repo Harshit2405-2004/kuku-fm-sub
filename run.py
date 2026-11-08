@@ -36,7 +36,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--api-key-env", help="name of the env var holding that endpoint's key")
     p.add_argument("--run-dir", help="continue in this existing run folder (finished episodes come from the cache)")
     p.add_argument("--episode-proposer", action="append", default=[], metavar="EPISODES=MODEL",
-                   help="proposer model for some episodes only, e.g. '3,17-23=groq/openai/gpt-oss-20b' (repeatable)")
+                   help="proposer model for some episodes only, e.g. '3,17-23=groq/openai/gpt-oss-20b' or '3=gemini/<model>|GEMINI_API_KEY' (repeatable)")
     return p.parse_args(argv)
 
 
@@ -45,12 +45,13 @@ def parse_episode_proposers(specs: list[str], base: dict) -> dict[int, dict]:
     out: dict[int, dict] = {}
     for spec in specs:
         eps, _, model = spec.partition("=")
+        model, _, key_env = model.partition("|")      # optional "|KEY_ENV_NAME" for another provider
         if not model:
             raise SystemExit(f"--episode-proposer needs EPISODES=MODEL, got {spec!r}")
         for part in eps.split(","):
             lo, _, hi = part.partition("-")
             for n in range(int(lo), int(hi or lo) + 1):
-                out[n] = {"model": model}
+                out[n] = {"model": model, **({"api_key_env": key_env} if key_env else {})}
     return out
 
 
