@@ -67,7 +67,8 @@ def test_proposer_prompt_is_selectable_and_version_recorded(tmp_path):
     manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["prompt_versions"]["proposer"] == "proposer_v4"
     default = app.build_config(True, "", "", "", False, tmp_path)
-    assert default["prompts"]["proposer"] == "proposer"          # default file is v3
+    assert default["prompts"]["proposer"] == "proposer_v4b"      # this branch's default (D-047); main uses "proposer" = v3
+    assert names["proposer_v4b"] == "proposer_v4b"
 
 
 def test_prompt_version_changes_the_cache_key():

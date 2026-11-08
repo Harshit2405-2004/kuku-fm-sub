@@ -72,10 +72,10 @@ build:
   arc_min_segment_s: 4.0
   arc_seg1_min_s: 8.0        # arc opening part: at least this long, so the hook has room to land
 
-# Which proposer prompt file to use (promo_finder/prompts/<name>.md). 'proposer' is proposer_v3; the version
-# inside the file is what goes into the cache key and the manifest.
+# Which proposer prompt file to use (promo_finder/prompts/<name>.md); the version inside the file is what goes
+# into the cache key and the manifest. 'proposer' = proposer_v3 (baseline on main); this branch defaults to v4b (D-047).
 prompts:
-  proposer: proposer
+  proposer: proposer_v4b
 
 rank:
   weights: {hook: 0.35, cliff: 0.30, standalone: 0.20, trope_pull: 0.10, pacing: 0.05}

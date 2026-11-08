@@ -414,3 +414,11 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Consequences: Any new `proposer_*.md` shows up in the app automatically. Tests in `tests/test_app.py`.
 - Reversible?: Yes.
 
+## D-047: proposer_v4b is the default on branch recall-sprint (main stays on v3)
+- Date: 2026-11-08 · Owner: Claude (proposed) · Status: Proposed
+- Context: After v4 left the candidate count unchanged (D-045), v4b replaces the count rule with "exactly 3 distinct candidates for every episode with conflict; 0–1 only for a quiet one". Test: gemini-3.5-flash-lite, the 10 gold episodes, proposer + build only. Counts in `private/recall_sprint.md` step 6.
+- Decision: Held-out lenient recall improved (3/5 → 4/5) and dev strict did not drop (0/8 → 1/8), so by the agreed rule `prompts.proposer` defaults to `proposer_v4b` on `recall-sprint`. Main and the deployed baseline app stay on proposer_v3. D-045's "keep baseline" still holds for main.
+- Alternatives: keep v3 (no gain); v4 (dev-only gain).
+- Consequences: Proposer tokens +15% prompt / +61% completion on these episodes; about +45% clips to judge; 28% of proposals were near-duplicates (dedupe removed them). Precision@10, the judge's top 20 and duplicate risk in the final ranking were not re-measured. Held-out episodes were seen for earlier variants, so the gain is indicative (13 gold promos).
+- Reversible?: Yes (one config line).
+

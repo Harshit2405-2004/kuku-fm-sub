@@ -669,3 +669,9 @@ Different episodes, so it's indicative, not a controlled comparison.
 ### Selectable proposer prompt  ·  2026-11-08  ·  status: done (branch `recall-sprint`)
 **What I did:** `prompts.proposer` config key (default `proposer` = proposer_v3), pipeline passes it to the proposer and the manifest records its version; app sidebar dropdown lists `proposer*.md`; 2 tests. Merged main into this branch (README links). README top line: "recall experiment" (held-out lenient recall did not improve).
 **Commands & results:** `pytest -q` → 272 passed. **Decisions:** D-046 · **AI mistakes caught:** none
+
+### Recall sprint step 6: proposer_v4b  ·  2026-11-08  ·  status: done (branch `recall-sprint`)
+**Prompt:** `proposer_v4b.md` = v4 with the count rule "exactly 3 distinct candidates for every episode with conflict, 0–1 for quiet". Why: v4 left the count at about 1 per episode.
+**Commands & results:** `scripts/propose_only.py --prompt proposer_v4b` on the 10 gold episodes → run `20261108-1736-v4bgold`: 18 proposed, 13 built, 0 too_short, 5 duplicates; dev recall 1/8 strict, 5/8 lenient; held-out 3/5 strict, 4/5 lenient (v3: 0/2 and 1/3). Proposer tokens vs v3: +7,952 prompt, +1,485 completion.
+**Decisions:** D-047 (v4b default on this branch) · **AI mistakes caught:** ai_log #16
+**Not re-measured:** precision, judge top-20, duplicates in the final ranking.
