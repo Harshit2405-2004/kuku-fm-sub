@@ -634,3 +634,9 @@ Different episodes, so it's indicative, not a controlled comparison.
 **Targets MISSED:** gold recall (any) ≥ 70% and recall@20 ≥ 50%, strict and lenient. recall@20 is also depressed because 26 clips could not be ranked.
 **Limitations / risks:** run A mixes three proposers and the ranking misses 26 unscored clips (mostly the flash-lite episodes); a rerun of the judge after qwen's quota resets would complete it (the 30 scored ones come from the cache; the batch shift means some re-judging).
 **Next:** rate `gold/precision_ratings.csv`; judge rerun when quota allows; package
+
+### T6.2 Packaging: README, leak check, raw outputs zip  ·  2026-11-08  ·  status: done
+**What I did:** product README (what it does, 3-step quickstart verified with `--mock`, "Swap the model" flags incl. `--episode-proposer` (with `|KEY_ENV`) and `--run-dir`, outputs, limitations incl. free-tier coverage, three proposer models and the partial judge). `leak_check.py --pre-push` (all history and commit messages): PASS. `submission/raw_outputs.zip` (git-ignored, 141 files, about 0.6 MB): run A, run B, six smoke/effort runs under `dev_runs/`, and both eval reports under `eval_reports/`.
+**Commands & results:** `python scripts/leak_check.py --pre-push` → PASS; `pytest -q` → 265 passed
+**Decisions:** none · **AI mistakes caught:** none
+**Next:** Harshit rates the blind sheet; judge rerun when qwen's quota resets
