@@ -31,6 +31,16 @@ python run.py --input input/<your-pack> --config config.yaml --run-name myrun
 
 Results land in `outputs/<timestamp>-<run-name>/`. Tests: `pytest -q`.
 
+## App
+
+```bash
+streamlit run app.py
+```
+
+Upload a `.zip` or several episode `.txt` files, or click **Try the fictional sample**, then **Run**. Mock mode is on by default (no key needed). Turn it off to use a real model: set the proposer and judge model names, an optional OpenAI-compatible API base, and paste an API key. The key is used only inside the running process for that run; it is not written to disk, logs, cache or the run manifest. Uploads and outputs go to a temporary folder per session. Results show as a ranked table with script excerpts, plus downloads for `promos.csv` and `review.md`.
+
+Live app: _link to be added after deploy_.
+
 ## Swap the model
 
 Models live in `config.yaml` (`models.proposer`, `models.arc`, `models.judge`). Override from the command line, no code change:

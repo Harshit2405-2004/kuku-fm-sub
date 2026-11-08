@@ -650,3 +650,9 @@ Different episodes, so it's indicative, not a controlled comparison.
 **Targets met / missed:** precision@10 met (6/10); recall (any and @20) and Spearman (> 0.4) missed.
 **Open issues / risks:** judge covers 30/56 clips in run A; gold is LLM-drafted and human-approved (D-033).
 **Next:** judge rerun after quota resets; submit
+
+### T6.4 Streamlit app  ·  2026-11-08  ·  status: done (on branch `app`, not yet merged)
+**What I did:** `app.py` (upload .zip/.txt or fictional sample; mock default ON; model/API base/key fields; per-stage progress bars; ranked table, script excerpts, promos.csv and review.md downloads); per-session temp dir; key passed by call wrapper (D-044); README "App" section; `tests/test_app.py` (5 tests). Fixed a nonexistent streamlit pin (1.67.0 → 1.65.0; ai_log #14).
+**Commands & results:** Streamlit AppTest: sample + Run in mock mode → table with 4 ranked clips, 0 errors; `pytest -q` and leak_check results below.
+**Decisions:** D-044 · **AI mistakes caught:** ai_log #14
+**Next:** merge `app` into main, deploy, README reviewer box (text needed)

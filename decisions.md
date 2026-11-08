@@ -389,3 +389,11 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Alternatives: a cliff penalty in the score (softer, but a strong hook could still outweigh it); removing low-cliff promos (loses brief-compliant clips).
 - Consequences: the top 10 are cliff ≥ 3 by the judge's own rubric; the judge's cliff score is now load-bearing, so its calibration matters (see eval).
 - Reversible?: Yes: set `min_cliff_top10: null`.
+
+## D-044: App takes an API key through a call wrapper, not the environment
+- Date: 2026-11-08 · Owner: Claude (proposed) · Status: Proposed
+- Context: The Streamlit app lets a reviewer paste a key. Setting `os.environ` is process-wide, so on a shared host one session's key could serve another session's run.
+- Decision: The typed key is passed to `run_pipeline` as a `completion_fn` wrapper that adds `api_key` to each call. The stages' `api_key_env` is set to None for that run, so the key is absent from the config snapshot and manifest. The LLM cache for app runs is a per-session temp dir. One key serves all stages.
+- Alternatives: set an env var (leaks across sessions); store the key in Streamlit secrets (a shared key on a public app).
+- Consequences: A pack that needs a different provider per stage can't be run from the UI; use `run.py`. Test: `tests/test_app.py`.
+- Reversible?: Yes.
