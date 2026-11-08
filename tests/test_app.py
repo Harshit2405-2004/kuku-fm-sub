@@ -56,3 +56,21 @@ def test_typed_key_never_reaches_config_or_manifest(tmp_path):
 def test_episode_list_parsing():
     assert app.parse_episode_list("1, 3,8") == [1, 3, 8]
     assert app.parse_episode_list("") is None
+
+
+def test_proposer_prompt_is_selectable_and_version_recorded(tmp_path):
+    names = app.proposer_prompts()
+    assert names["proposer"] == "proposer_v3" and names["proposer_v4"] == "proposer_v4"
+    cfg = app.build_config(True, "", "", "", False, tmp_path, "proposer_v4")
+    assert cfg["prompts"]["proposer"] == "proposer_v4"
+    run_dir, _ = app.run_app_pipeline(SYNTH, tmp_path, cfg)
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["prompt_versions"]["proposer"] == "proposer_v4"
+    default = app.build_config(True, "", "", "", False, tmp_path)
+    assert default["prompts"]["proposer"] == "proposer"          # default file is v3
+
+
+def test_prompt_version_changes_the_cache_key():
+    from promo_finder.cache import cache_key
+    msgs = [{"role": "user", "content": "x"}]
+    assert cache_key("m", "proposer_v3", msgs, "S", None) != cache_key("m", "proposer_v4", msgs, "S", None)

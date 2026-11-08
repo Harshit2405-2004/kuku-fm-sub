@@ -72,6 +72,11 @@ build:
   arc_min_segment_s: 4.0
   arc_seg1_min_s: 8.0        # arc opening part: at least this long, so the hook has room to land
 
+# Which proposer prompt file to use (promo_finder/prompts/<name>.md). 'proposer' is proposer_v3; the version
+# inside the file is what goes into the cache key and the manifest.
+prompts:
+  proposer: proposer
+
 rank:
   weights: {hook: 0.35, cliff: 0.30, standalone: 0.20, trope_pull: 0.10, pacing: 0.05}
   bonus: {early_ep_max: 5, early_ep: 0.06, mid_ep_max: 15, mid_ep: 0.03, sweet_spot: [30, 45], sweet_spot_bonus: 0.03, arc: 0.02}

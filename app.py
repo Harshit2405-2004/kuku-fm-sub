@@ -56,7 +56,14 @@ def key_injecting_completion(api_key: str) -> Callable:
     return complete
 
 
-def build_config(mock: bool, proposer: str, judge: str, api_base: str, use_typed_key: bool, work: Path) -> dict:
+def proposer_prompts() -> dict[str, str]:
+    """{file name: version} for every proposer prompt in promo_finder/prompts (proposer.md, proposer_v4.md, ...)."""
+    from promo_finder.llm import PROMPTS_DIR, load_prompt
+    return {p.stem: load_prompt(p.stem)[0] for p in sorted(PROMPTS_DIR.glob("proposer*.md"))}
+
+
+def build_config(mock: bool, proposer: str, judge: str, api_base: str, use_typed_key: bool, work: Path,
+                 proposer_prompt: str | None = None) -> dict:
     base = load_config(CONFIG)
     default_proposer = base["models"]["proposer"]["model"]
     cfg = apply_overrides(
@@ -68,6 +75,8 @@ def build_config(mock: bool, proposer: str, judge: str, api_base: str, use_typed
     if use_typed_key:
         for stage in cfg["models"].values():
             stage["api_key_env"] = None          # the wrapper supplies the key instead
+    if proposer_prompt:
+        cfg.setdefault("prompts", {})["proposer"] = proposer_prompt
     cfg["cache_dir"] = str(work / "cache")       # session temp dir, not the repo's .cache
     return cfg
 
@@ -127,6 +136,12 @@ def main() -> None:
         api_key = st.text_input("API key (optional)", type="password", disabled=mock,
                                 help="Used only in this process for this run. Not saved anywhere. "
                                      "One key is used for every stage; leave blank to use server environment variables.")
+        prompts = proposer_prompts()
+        default_prompt = base.get("prompts", {}).get("proposer", "proposer")
+        names = list(prompts)
+        prompt_name = st.selectbox("Proposer prompt version", names, index=names.index(default_prompt),
+                                   format_func=lambda n: prompts[n], disabled=mock,
+                                   help="Which prompts/proposer*.md file the proposer uses. The version is recorded in the manifest.")
         episodes_text = st.text_input("Episodes to run (blank = all)", "", help="e.g. 1,3,8. Real runs cost tokens.")
 
     st.subheader("1. Input")
@@ -151,7 +166,7 @@ def main() -> None:
             input_path = SAMPLE
         else:
             input_path = save_uploads([(f.name, f.getvalue()) for f in uploads], work / "upload")
-        cfg = build_config(mock, proposer, judge, api_base, bool(api_key) and not mock, work)
+        cfg = build_config(mock, proposer, judge, api_base, bool(api_key) and not mock, work, prompt_name)
         bars = {"propose": st.progress(0.0, "Proposing clips per episode"), "judge": st.progress(0.0, "Judging")}
 
         def progress(stage: str, done: int, total: int) -> None:

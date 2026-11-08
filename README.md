@@ -1,5 +1,7 @@
 # Kuku Promo Finder
 
+> **Recall experiment build** (default proposer = `proposer_v3`; no variant beat the baseline). Baseline app: https://kuku-fm-sub.streamlit.app/ · Sprint results: see `decisions.md` D-045+.
+
 Reads a microdrama screenplay pack (timestamped episode scripts) and outputs a **ranked shortlist of 20–60 s promo clips**. Each clip has its episode, the start and end time of every segment, the hook, the cliffhanger, scores from a judge model, and one line on why it works. Built for the Kuku AI Generalist take-home, Problem 1.
 
 > **For Kuku reviewers — start here**

@@ -665,3 +665,7 @@ Different episodes, so it's indicative, not a controlled comparison.
 **Commands & results:** `scripts/rejudge.py` (judge + rank only) on run A's 56 built candidates with gemini-3.5-flash → run folder `20261108-1717-flashjudge`: 56/56 scored, 0 errors, 117,861 prompt + 49,006 completion tokens, 280 s. recall@20 dev 0 strict / 1 lenient of 8; held-out 1 / 2 of 5 (run A as shipped: 0/2 and 0/1). 9 of 15 human-rated clips remain in its top 15. Judge–human Spearman 0.18 (n=15).
 **Decisions:** D-045 (keep baseline) · **AI mistakes caught:** ai_log #15
 **Targets:** no gold-recall target met; no variant adopted. Details in `private/recall_sprint.md`.
+
+### Selectable proposer prompt  ·  2026-11-08  ·  status: done (branch `recall-sprint`)
+**What I did:** `prompts.proposer` config key (default `proposer` = proposer_v3), pipeline passes it to the proposer and the manifest records its version; app sidebar dropdown lists `proposer*.md`; 2 tests. Merged main into this branch (README links). README top line: "recall experiment" (held-out lenient recall did not improve).
+**Commands & results:** `pytest -q` → 272 passed. **Decisions:** D-046 · **AI mistakes caught:** none

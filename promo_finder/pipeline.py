@@ -113,12 +113,13 @@ def _run(input_path, cfg, run_id, run_dir, aliases_path, episodes_filter, comple
     dropped: list[dict] = []
     proposed_per_episode: dict[int, int] = {}
     episode_models: dict[int, str] = {}      # which model served each episode (manifest)
+    proposer_prompt = (cfg.get("prompts") or {}).get("proposer", "proposer")   # file name in promo_finder/prompts/
     for i, n in enumerate(todo, 1):
         ep_cfg = _proposer_cfg_for(cfg, n)
         episode_models[n] = ep_cfg["models"]["proposer"]["model"]
         try:
             props, drop = propose_episode(episodes[n], cast, ep_cfg, usage, raw_dir=run_dir / "proposals_raw",
-                                          completion_fn=completion_fn)
+                                          completion_fn=completion_fn, prompt_name=proposer_prompt)
         except Exception as error:
             log.error("E%02d: proposer failed: %s", n, error)
             errors.append({"stage": "proposer", "episode": n, "error": f"{type(error).__name__}: {error}"[:300]})
@@ -186,7 +187,8 @@ def _run(input_path, cfg, run_id, run_dir, aliases_path, episodes_filter, comple
         "git_commit": _git_commit(),
         "mock": bool(cfg.get("mock")),
         "models": {stage: ("mock" if cfg.get("mock") else c["model"]) for stage, c in cfg["models"].items()},
-        "prompt_versions": {name: load_prompt(name)[0] for name in ("proposer", "arc", "judge")},
+        "prompt_versions": {"proposer": load_prompt(proposer_prompt)[0], "arc": load_prompt("arc")[0],
+                            "judge": load_prompt("judge")[0]},
         "arcs": arcs_status,
         "episodes_parsed": len(episodes),
         "episodes_run": todo,

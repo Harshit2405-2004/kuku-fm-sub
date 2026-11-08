@@ -406,3 +406,11 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Consequences: `proposer_v4.md`, `scripts/recall_pool.py`, `scripts/propose_only.py`, `scripts/rejudge.py` live on branch `recall-sprint`, not merged. The finding "recall is limited by candidate generation, not ranking" goes in the doc.
 - Reversible?: Yes.
 
+## D-046: Proposer prompt is selectable by config key and app dropdown
+- Date: 2026-11-08 · Owner: Claude (proposed) · Status: Proposed
+- Context: The sprint compared two proposer prompts; the app and CLI had the file name hard-wired.
+- Decision: `prompts.proposer` in config.yaml names a file in `promo_finder/prompts/` (default `proposer` = proposer_v3). The app lists every `proposer*.md` with its version. The version inside the file stays in the cache key and the manifest. On this branch the default is still v3 because nothing won (D-045).
+- Alternatives: copy the prompt into config (long text in config); a CLI flag only.
+- Consequences: Any new `proposer_*.md` shows up in the app automatically. Tests in `tests/test_app.py`.
+- Reversible?: Yes.
+
