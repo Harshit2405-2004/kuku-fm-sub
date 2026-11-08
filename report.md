@@ -660,3 +660,8 @@ Different episodes, so it's indicative, not a controlled comparison.
 ### Recall sprint steps 1–2  ·  2026-11-08  ·  status: done (branch `recall-sprint`)
 **Prompt:** `proposer_v4.md` added (v3 untouched): rule 1 softened to "prefer opening on a strike/slap/reveal; otherwise the strongest conflict line"; "up to 4 candidates, usually 2–4, zero only for quiet episodes". Why: test whether more candidates and a softer opening rule raise recall. Not wired into the default config.
 **Commands & results:** `scripts/recall_pool.py` (pooled recall, counts only), `scripts/propose_only.py` (proposer+build only into a new run folder). v4 on the 10 gold episodes: 10 proposed, 9 built (v3: 12 proposed, 9 built); run folders `20261108-1716-v4gold` (new); runs A and B untouched.
+
+### Recall sprint steps 3–5  ·  2026-11-08  ·  status: done (branch `recall-sprint`, NOT merged)
+**Commands & results:** `scripts/rejudge.py` (judge + rank only) on run A's 56 built candidates with gemini-3.5-flash → run folder `20261108-1717-flashjudge`: 56/56 scored, 0 errors, 117,861 prompt + 49,006 completion tokens, 280 s. recall@20 dev 0 strict / 1 lenient of 8; held-out 1 / 2 of 5 (run A as shipped: 0/2 and 0/1). 9 of 15 human-rated clips remain in its top 15. Judge–human Spearman 0.18 (n=15).
+**Decisions:** D-045 (keep baseline) · **AI mistakes caught:** ai_log #15
+**Targets:** no gold-recall target met; no variant adopted. Details in `private/recall_sprint.md`.

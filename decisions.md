@@ -397,3 +397,12 @@ Every non-obvious choice is recorded here: what we chose, what we rejected, and 
 - Alternatives: set an env var (leaks across sessions); store the key in Streamlit secrets (a shared key on a public app).
 - Consequences: A pack that needs a different provider per stage can't be run from the UI; use `run.py`. Test: `tests/test_app.py`.
 - Reversible?: Yes.
+
+## D-045: Recall sprint outcome: keep proposer_v3 and the qwen judge; proposer_v4 and the flash judge are not adopted
+- Date: 2026-11-08 · Owner: Claude (proposed) · Status: Proposed
+- Context: Recall missed its targets. The sprint tuned only on dev episodes 1, 8, 12, 17, 18, 31, 42 and reported held-out 3, 27, 45 apart, with the matching rule unchanged. Details and counts: `private/recall_sprint.md`.
+- Decision: Baseline stays. proposer_v4 (softer opening rule, "up to 4 candidates") ties the baseline on held-out lenient recall (3/5) and dev strict (0/8), and still returns about one candidate per episode. The gemini-3.5-flash judge over all 56 clips scores everything but changes who is in the top 15 (6 of 15 rated clips left it) and correlates less with the human ratings (0.18 vs 0.25).
+- Alternatives: adopt v4 (gain only on the tuning episodes); adopt the flash judge (fills the unscored gap, costs about 5× the output tokens).
+- Consequences: `proposer_v4.md`, `scripts/recall_pool.py`, `scripts/propose_only.py`, `scripts/rejudge.py` live on branch `recall-sprint`, not merged. The finding "recall is limited by candidate generation, not ranking" goes in the doc.
+- Reversible?: Yes.
+
