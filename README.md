@@ -2,6 +2,14 @@
 
 Reads a microdrama screenplay pack (timestamped episode scripts) and outputs a **ranked shortlist of 20–60 s promo clips**. Each clip has its episode, the start and end time of every segment, the hook, the cliffhanger, scores from a judge model, and one line on why it works. Built for the Kuku AI Generalist take-home, Problem 1.
 
+> **For Kuku reviewers — start here**
+> - **Try it:** [live app](APP_URL_PLACEHOLDER) (mock mode needs no key) · or `python run.py --input samples/synthetic_show --mock`
+> - **Results (run A, 50 episodes):** 30/30 clips valid (20–60 s, hook ≤ 3 s, shot-aligned) · blind human precision@10 **6/10** · gold recall 3/13 strict, 6/13 lenient (missed target, analysed in the doc) · judge–human Spearman 0.25 → human stays in the loop.
+> - **Design in one line:** the LLM picks *line IDs*; code computes every timestamp, so invented times are impossible by construction.
+> - **Swap in your model:** `python run.py --input <pack> --model openai/<model> --api-base <url> --api-key-env KEY`
+> - **How I worked with AI:** [`decisions.md`](decisions.md) (every choice + alternatives) · [`ai_log.md`](ai_log.md) (where AI got it wrong, and which check caught it) · [`report.md`](report.md) (build log) · [`docs/PROCESS_GUIDE.md`](docs/PROCESS_GUIDE.md) (worked example of every step).
+> - The input pack is confidential: no script content is in this repo (enforced by `scripts/leak_check.py`); raw outputs are shared via the form link.
+
 A promo here follows the brief: a 20–60 s clip that opens on a hook in the first 3 seconds, ends on an unresolved cliffhanger, and makes sense to someone who has never seen the show. It can be one stretch, a jump-cut of two stretches from one episode, or an arc joining two episodes.
 
 ## How it works
